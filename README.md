@@ -1,3 +1,3 @@
-# MODULE_NAME
+# wf_base_data
 
-SHORT_DESCRIPTION
+Python tools for working with Wildflower Schools base data
