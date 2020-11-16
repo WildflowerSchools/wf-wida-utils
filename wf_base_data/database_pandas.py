@@ -25,7 +25,9 @@ class DataTablePandas(DataTable):
             ))
             records.drop(already_existing_records, inplace=True)
         self.data_table = pd.concat((self.data_table, records))
+        self.data_table.sort_index(inplace=True)
         return_key_values = list(records.index)
+        logger.info('Created {} records'.format(len(return_key_values)))
         return return_key_values
 
     def _update_records(self, records):
@@ -37,7 +39,9 @@ class DataTablePandas(DataTable):
             ))
             records.drop(non_existing_records, inplace=True)
         self.data_table.update(records)
+        self.data_table.sort_index(inplace=True)
         return_key_values = list(records.index)
+        logger.info('Updated {} records'.format(len(return_key_values)))
         return return_key_values
 
     def _delete_records(self, records):
@@ -49,5 +53,7 @@ class DataTablePandas(DataTable):
             ))
             records.drop(non_existing_records, inplace=True)
         self.data_table.drop(records.index, inplace=True)
+        self.data_table.sort_index(inplace=True)
         return_key_values = list(records.index)
+        logger.info('Deleted {} records'.format(len(return_key_values)))
         return return_key_values
