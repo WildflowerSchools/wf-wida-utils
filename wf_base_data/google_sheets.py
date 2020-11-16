@@ -25,7 +25,7 @@ def ingest_student_data_google_sheet(sheet_id, pull_date):
     df['tc_school_id'] = df['school_id'].astype(int)
     df['child_raw_dict'] = df['child_raw'].apply(lambda x: json.loads(x))
     df['tc_student_id'] = df['child_raw_dict'].apply(lambda x: int(x.get('id')))
-    df['pull_date'] = pull_date
+    df['pull_datetime'] = pd.to_datetime(pull_date)
     df['student_first_name'] = df['child_raw_dict'].apply(lambda x: x.get('first_name'))
     df['student_last_name'] = df['child_raw_dict'].apply(lambda x: x.get('last_name'))
     df['student_birth_date'] = df['child_raw_dict'].apply(lambda x: pd.to_datetime(x.get('birth_date')).date())
@@ -36,7 +36,7 @@ def ingest_student_data_google_sheet(sheet_id, pull_date):
     df = df.reindex(columns=[
         'tc_school_id',
         'tc_student_id',
-        'pull_date',
+        'pull_datetime',
         'student_first_name',
         'student_last_name',
         'student_birth_date',
