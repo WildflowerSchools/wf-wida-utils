@@ -1,10 +1,10 @@
-from .core import DataTable
+from .database import DataTable
 import pandas as pd
 import logging
 
 logger = logging.getLogger(__name__)
 
-class PandasDataTable(DataTable):
+class DataTablePandas(DataTable):
     """
     Class to define a Pandas table for Wildflower base data
     """

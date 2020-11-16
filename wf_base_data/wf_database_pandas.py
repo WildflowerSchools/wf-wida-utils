@@ -1,6 +1,6 @@
-from .pandas_data_table import PandasDataTable
+from .database_pandas import DataTablePandas
 
-class StudentIDDataTablePandas(PandasDataTable):
+class StudentIDDataTablePandas(DataTablePandas):
     def __init__(self):
         super().__init__(
             key_column_names = [
@@ -12,7 +12,7 @@ class StudentIDDataTablePandas(PandasDataTable):
             ]
         )
 
-class TransparentClassroomStudentDataTablePandas(PandasDataTable):
+class TransparentClassroomStudentDataTablePandas(DataTablePandas):
     def __init__(self):
         super().__init__(
             key_column_names = [
