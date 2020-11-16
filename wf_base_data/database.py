@@ -4,6 +4,32 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+class Database:
+    """
+    Class to define a generic database for Wildflower base data
+    """
+    def __init__(
+        self,
+        schema
+    ):
+        """
+        Contructor for Database
+
+        The schema input should be a dictionary with data table names as keys
+        and column names as values in the format {'DATA_TABLE_NAME':
+        {'key_column_names': [...], 'value_column_names': [...]}, ...}
+
+        Parameters:
+            schema (dict of dict): Names and column names for data tables
+        """
+        for data_table_name, data_table_column_names in schema.items():
+            logger.info('Initializing data table {} with key column names {} and value column names {}'.format(
+                data_table_name,
+                data_table_column_names['key_column_names'],
+                data_table_column_names['value_column_names']
+            ))
+        self.schema = schema
+
 class DataTable:
     """
     Class to define a generic table for Wildflower base data
@@ -91,6 +117,32 @@ class DataTable:
         return return_key_values
 
     def _delete_records(self, records):
+        raise NotImplementedError('Method must be implemented by child class')
+
+    def dataframe(self):
+        """
+        Returns a Pandas dataframe containing the data in the data table.
+
+        Returns:
+            (DataFrame): Pandas dataframe containing the data in the data table
+        """
+        dataframe = self._dataframe()
+        return dataframe
+
+    def _dataframe(self):
+        raise NotImplementedError('Method must be implemented by child class')
+
+    def index(self):
+        """
+        Returns a Pandas index containing all key values in the data table.
+
+        Returns:
+            (Index): Pandas index containing all key values in the data table
+        """
+        index = self._index()
+        return index
+
+    def _index(self):
         raise NotImplementedError('Method must be implemented by child class')
 
     def normalize_records(self, records, normalize_value_columns=True):
