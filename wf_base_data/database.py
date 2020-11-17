@@ -1,5 +1,4 @@
 import pandas as pd
-import uuid
 import logging
 
 logger = logging.getLogger(__name__)
@@ -183,8 +182,3 @@ class DataTable:
             ))
         records = records.reindex(columns=self.value_column_names)
         return records
-
-def generate_student_id():
-    uuid_object = uuid.uuid4()
-    student_id = uuid_object.int & int('FFFFFFFF', 16)
-    return student_id
