@@ -8,8 +8,7 @@ class DatabasePandas(Database):
     """
     Class to define a Pandas database for Wildflower base data
     """
-    def __init__(self, schema):
-        super().__init__(schema=schema)
+    def _init(self, schema):
         self.data_tables = dict()
         for data_table_name, data_table_column_names in self.schema.items():
             self.data_tables[data_table_name] = DataTablePandas(
@@ -21,11 +20,7 @@ class DataTablePandas(DataTable):
     """
     Class to define a Pandas table for Wildflower base data
     """
-    def __init__(self, key_column_names, value_column_names):
-        super().__init__(
-            key_column_names=key_column_names,
-            value_column_names=value_column_names
-        )
+    def _init(self, key_column_names, value_column_names):
         self.df = pd.DataFrame(columns = key_column_names + value_column_names)
         self.df.set_index(key_column_names, inplace=True)
 

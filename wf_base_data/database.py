@@ -28,6 +28,10 @@ class Database:
                 data_table_column_names['value_column_names']
             ))
         self.schema = schema
+        self._init(schema)
+
+    def _init(self, schema):
+        raise NotImplementedError('Method must be implemented by child class')
 
 class DataTable:
     """
@@ -51,6 +55,10 @@ class DataTable:
         ))
         self.key_column_names = list(key_column_names)
         self.value_column_names = list(value_column_names)
+        self._init(key_column_names, value_column_names)
+
+    def _init(self, key_column_names, value_column_names):
+        raise NotImplementedError('Method must be implemented by child class')
 
     def create_records(self, records):
         """
