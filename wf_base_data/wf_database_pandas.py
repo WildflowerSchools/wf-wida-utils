@@ -1,41 +1,34 @@
 from .database_pandas import DatabasePandas
 from .google_sheets import ingest_student_data_google_sheet
 import pandas as pd
+from collections import OrderedDict
 import uuid
 import logging
 
 logger = logging.getLogger(__name__)
 
-SCHEMA = {
-    'student_ids': {
-        'key_column_names': [
-            'tc_school_id',
-            'tc_student_id'
-        ],
-        'value_column_names': [
-            'student_id'
-        ]
-    },
-    'transparent_classroom_student_data': {
-            'key_column_names': [
-                'tc_school_id',
-                'tc_student_id',
-                'pull_datetime'
-            ],
-            'value_column_names': [
-                'student_first_name',
-                'student_last_name',
-                'student_birth_date',
-                'student_gender',
-                'student_ethnicity_list',
-                'student_dominant_language'
-            ]
-    }
+DATABASE_SCHEMA = {
+    'student_ids': OrderedDict([
+        ('tc_school_id', {'key': True, 'type': 'integer'}),
+        ('tc_student_id', {'key': True, 'type': 'integer'}),
+        ('student_id', {'type': 'integer'})
+    ]),
+    'transparent_classroom_student_data': OrderedDict([
+        ('tc_school_id', {'key': True, 'type': 'integer'}),
+        ('tc_student_id', {'key': True, 'type': 'integer'}),
+        ('pull_datetime', {'key': True, 'type': 'datetime'}),
+        ('student_first_name', {'type': 'string'}),
+        ('student_last_name', {'type': 'string'}),
+        ('student_birth_date', {'type': 'date'}),
+        ('student_gender', {'type': 'string'}),
+        ('student_ethnicity_list', {'type': 'list'}),
+        ('student_dominant_language', {'type': 'string'})
+    ])
 }
 
 class WildflowerDatabasePandas(DatabasePandas):
     def __init__(self):
-        super().__init__(schema=SCHEMA)
+        super().__init__(database_schema=DATABASE_SCHEMA)
 
     def pull_transparent_classroom_student_records_google_sheets(
         self,

@@ -3,61 +3,93 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+TYPES = {
+    'integer': {
+        'pandas_dtype': 'Int64',
+        'converter': lambda x: x.astype('Int64')
+    },
+    'float': {
+        'pandas_dtype': 'float',
+        'converter': lambda x: x.astype('float')
+    },
+    'string': {
+        'pandas_dtype': 'string',
+        'converter': lambda x: x.astype('string')
+    },
+    'boolean': {
+        'pandas_dtype': 'boolean',
+        'converter': lambda x: x.astype('boolean')
+    },
+    'datetime': {
+        'pandas_dtype': 'datetime64[ns]',
+        'converter': pd.to_datetime
+    },
+    'date': {
+        'pandas_dtype': 'object',
+        'converter': lambda x: pd.DatetimeIndex(pd.to_datetime(x)).date
+    },
+    'list': {
+        'pandas_dtype': 'object',
+        # 'converter': lambda x: [list(item) for item in x]
+        'converter': lambda x: x
+    }
+}
+
 class Database:
     """
-    Class to define a generic database for Wildflower base data
+    Class to define a generic database object
     """
     def __init__(
         self,
-        schema
+        database_schema
     ):
         """
         Contructor for Database
 
-        The schema input should be a dictionary with data table names as keys
-        and column names as values in the format {'DATA_TABLE_NAME':
-        {'key_column_names': [...], 'value_column_names': [...]}, ...}
+        The database schema input should be a dict with data table names
+        as keys and data table schemas as values. See DataTable object for data
+        table schema format.
 
         Parameters:
-            schema (dict of dict): Names and column names for data tables
+            database_schema (dict): Database schema
         """
-        for data_table_name, data_table_column_names in schema.items():
-            logger.info('Initializing data table {} with key column names {} and value column names {}'.format(
-                data_table_name,
-                data_table_column_names['key_column_names'],
-                data_table_column_names['value_column_names']
-            ))
-        self.schema = schema
-        self._init(schema)
+        self.database_schema = database_schema
+        self.field_names = database_schema.keys()
+        self._init()
 
-    def _init(self, schema):
+    def _init(self):
         raise NotImplementedError('Method must be implemented by child class')
 
 class DataTable:
     """
-    Class to define a generic table for Wildflower base data
+    Class to define a generic data table object
     """
     def __init__(
         self,
-        key_column_names,
-        value_column_names
+        data_table_schema
     ):
         """
         Contructor for DataTable
 
-        Parameters:
-            key_column_names (list of str): Column names for key columns
-            value_column_names (list of str): Column names for value columns
-        """
-        logger.info('Initializing data table with key column names {} and value column names {}'.format(
-            key_column_names,
-            value_column_names
-        ))
-        self.key_column_names = list(key_column_names)
-        self.value_column_names = list(value_column_names)
-        self._init(key_column_names, value_column_names)
+        The data table schema should be an OrderedDict with field names as keys
+        and field schemas as values. Field schemas should be dicts with the
+        format {'type': TYPE_NAME, 'key': [True|False]}. Possible type names are
+        'integer', 'float', 'string', 'boolean', 'datetime', 'date', or 'list'.
 
-    def _init(self, key_column_names, value_column_names):
+        Parameters:
+            data_table_schema (OrderedDict): Data table schema
+        """
+        self.data_table_schema = data_table_schema
+        self.key_field_names = list()
+        self.value_field_names = list()
+        for field_name, field_schema in data_table_schema.items():
+            if field_schema.get('key', False):
+                self.key_field_names.append(field_name)
+            else:
+                self.value_field_names.append(field_name)
+        self._init()
+
+    def _init(self):
         raise NotImplementedError('Method must be implemented by child class')
 
     def create_records(self, records):
@@ -166,27 +198,35 @@ class DataTable:
         Returns:
         (DataFrame): Normalized records
         """
+        logger.info('Normalizing input records in preparation for database operation')
         drop=False
         if records.index.names == [None]:
             drop=True
         records = pd.DataFrame(records).reset_index(drop=drop)
-        if not set(self.key_column_names).issubset(set(records.columns)):
+        records = self.type_convert_columns(records)
+        if not set(self.key_field_names).issubset(set(records.columns)):
             raise ValueError('Key columns {} missing from specified records'.format(
-                set(self.key_column_names) - set(records.columns)
+                set(self.key_field_names) - set(records.columns)
             ))
-        records.set_index(self.key_column_names, inplace=True)
+        records.set_index(self.key_field_names, inplace=True)
         if not normalize_value_columns:
             return records
         input_value_column_names = list(records.columns)
-        spurious_value_column_names = set(input_value_column_names) - set(self.value_column_names)
+        spurious_value_column_names = set(input_value_column_names) - set(self.value_field_names)
         if len(spurious_value_column_names) > 0:
             logger.info('Specified records contain value column names not in data table: {}. These columns will be ignored'.format(
                 spurious_value_column_names
             ))
-        missing_value_column_names = set(self.value_column_names) - set(input_value_column_names)
+        missing_value_column_names = set(self.value_field_names) - set(input_value_column_names)
         if len(missing_value_column_names) > 0:
             logger.info('Data table contains value column names not found in specified records: {}. These values will be empty'.format(
                 missing_value_column_names
             ))
-        records = records.reindex(columns=self.value_column_names)
+        records = records.reindex(columns=self.value_field_names)
         return records
+
+    def type_convert_columns(self, dataframe):
+        logger.info('Converting data types for input records')
+        for field_name, field_schema in self.data_table_schema.items():
+            dataframe[field_name] = TYPES[field_schema['type']]['converter'](dataframe[field_name])
+        return dataframe
