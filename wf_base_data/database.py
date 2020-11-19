@@ -114,6 +114,7 @@ class DataTable:
         records = self.normalize_records(records)
         logger.info('Attempting to create {} records'.format(len(records)))
         return_key_values = self._create_records(records)
+        self.check_integrity()
         return return_key_values
 
     def _create_records(self, records):
@@ -136,6 +137,7 @@ class DataTable:
         records = self.normalize_records(records)
         logger.info('Attempting to update {} records'.format(len(records)))
         return_key_values = self._update_records(records)
+        self.check_integrity()
         return return_key_values
 
     def _update_records(self, records):
@@ -158,6 +160,7 @@ class DataTable:
         records = self.normalize_records(records)
         logger.info('Attempting to delete {} records'.format(len(records)))
         return_key_values = self._delete_records(records)
+        self.check_integrity()
         return return_key_values
 
     def _delete_records(self, records):
