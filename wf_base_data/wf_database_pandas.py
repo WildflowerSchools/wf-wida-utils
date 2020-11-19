@@ -72,6 +72,7 @@ class WildflowerDatabasePandas(DatabasePandas):
     def add_transparent_classroom_student_records(self, records):
         self.data_tables['transparent_classroom_student_data_history'].create_records(records)
         self.add_new_student_ids()
+        self.check_structure()
 
     def add_new_student_ids(self):
         logger.info('Adding Wildflower student IDs for new Transparent Classroom students')
@@ -100,9 +101,37 @@ class WildflowerDatabasePandas(DatabasePandas):
                 break
             logger.info('Duplicates found among generated Wildflower student IDs. Regenerating.')
         logger.info('Adding new Wildflower student IDs to database.')
+        self.data_tables['students'].create_records(student_id_records.reset_index(drop=True))
         self.data_tables['transparent_classroom_students'].create_records(student_id_records)
 
     def generate_student_id(self):
         uuid_object = uuid.uuid4()
         student_id = uuid_object.int & int('FFFFFFFF', 16)
         return student_id
+
+    def check_structure(self):
+        logger.info('Checking database structure')
+        student_ids_wf_students_table = self.data_tables['students'].keys()
+        student_ids_wf_tc_table = set(self.data_tables['transparent_classroom_students'].dataframe()['student_id_wf'])
+        student_ids_wf_students_table_but_not_tc_table = student_ids_wf_students_table.difference(student_ids_wf_tc_table)
+        if len(student_ids_wf_students_table_but_not_tc_table) > 0:
+            raise ValueError('The following Wildflower student IDs are in the \'students\' table but not the \'transparent_classroom_students\' table: {}'.format(
+                student_ids_wf_students_table_but_not_tc_table
+            ))
+        student_ids_wf_tc_table_but_not_students_table = student_ids_wf_tc_table.difference(student_ids_wf_students_table)
+        if len(student_ids_wf_tc_table_but_not_students_table) > 0:
+            raise ValueError('The following Wildflower student IDs are in the \'transparent_classroom_students\' but not the \'students\' table: {}'.format(
+                student_ids_wf_tc_table_but_not_students_table
+            ))
+        student_ids_tc_students_table = self.data_tables['transparent_classroom_students'].keys()
+        student_ids_tc_history_table = set(self.data_tables['transparent_classroom_student_data_history'].index().droplevel('pull_datetime'))
+        student_ids_tc_students_table_but_not_history_table = student_ids_tc_students_table.difference(student_ids_tc_history_table)
+        if len(student_ids_tc_students_table_but_not_history_table) > 0:
+            raise ValueError('The following Transparent Classroom student IDs are in the \'transparent_classroom_students\' table but not the \'transparent_classroom_student_data_history\' table: {}'.format(
+                student_ids_tc_students_table_but_not_history_table
+            ))
+        student_ids_tc_history_table_but_not_students_table = student_ids_tc_history_table.difference(student_ids_tc_students_table)
+        if len(student_ids_tc_history_table_but_not_students_table) > 0:
+            raise ValueError('The following Transparent Classroom student IDs are in the \'transparent_classroom_student_data_history\' table but not the \'transparent_classroom_students\' table: {}'.format(
+                student_ids_tc_history_table_but_not_students_table
+            ))
