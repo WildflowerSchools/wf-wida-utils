@@ -54,7 +54,6 @@ class Database:
             database_schema (dict): Database schema
         """
         self.database_schema = database_schema
-        self.field_names = database_schema.keys()
         self._init()
 
     def _init(self):

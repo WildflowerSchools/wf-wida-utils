@@ -3,6 +3,7 @@
 Python tools for working with Wildflower Schools base data
 
 ## Tasks
+* Fix inheritance structure so database init can happen at parent class level
 * Figure out why `student_last_day` ends up being a mix of `NaT` and `NaN` for missing values
 * Add methods to pull all current Wildflower student IDs, all TC student IDs in history, all TC student IDs in mapping
 * Add school ID when pulling student data for multiple schools from Transparent Classroom
