@@ -60,6 +60,11 @@ class Database:
     def _init(self):
         raise NotImplementedError('Method must be implemented by child class')
 
+    def check_integrity(self):
+        for data_table_name, data_table in self.data_tables.items():
+            logger.info('Checking integrity of data table: {}'.format(data_table_name))
+            data_table.check_integrity()
+
 class DataTable:
     """
     Class to define a generic data table object
@@ -171,6 +176,15 @@ class DataTable:
     def _dataframe(self):
         raise NotImplementedError('Method must be implemented by child class')
 
+    def keys(self):
+        """
+        Returns a set containing all of the key values in the data table.
+
+        Returns:
+        (set): Key values in data table
+        """
+        return set(self.index())
+
     def index(self):
         """
         Returns a Pandas index containing all key values in the data table.
@@ -230,3 +244,42 @@ class DataTable:
         for field_name, field_schema in self.data_table_schema.items():
             dataframe[field_name] = TYPES[field_schema['type']]['converter'](dataframe[field_name])
         return dataframe
+
+    def check_integrity(self):
+        self.check_for_duplicate_keys()
+        self.check_field_dtypes()
+
+    def check_for_duplicate_keys(self):
+        logger.info('Checking for duplicate keys')
+        if self.keys_duplicated():
+            raise ValueError('Data table contains duplicate keys')
+
+    def keys_duplicated(self):
+        return self.index().duplicated().any()
+
+    def check_field_dtypes(self):
+        df = self.dataframe()
+        if len(df) == 0:
+            logger.info('Data table has no entries. Skipping dtype checking.')
+            return
+        logger.info('Checking dtype of each field')
+        for key_field_name in self.key_field_names:
+            logger.info('Checking dtype of key field: {}'.format(key_field_name))
+            field_dtype = df.index.get_level_values(key_field_name).dtype
+            schema_dtype = TYPES[self.data_table_schema[key_field_name]['type']]['pandas_dtype']
+            if field_dtype != schema_dtype:
+                raise ValueError('Key field {} has dtype {} but schema specifies dtype {}'.format(
+                    key_field_name,
+                    field_dtype,
+                    schema_dtype
+                ))
+        for value_field_name in self.value_field_names:
+            logger.info('Checking dtype of value field: {}'.format(value_field_name))
+            field_dtype = df[value_field_name].dtype
+            schema_dtype = TYPES[self.data_table_schema[value_field_name]['type']]['pandas_dtype']
+            if field_dtype != schema_dtype:
+                raise ValueError('Value field {} has dtype {} but schema specifies dtype {}'.format(
+                    value_field_name,
+                    field_dtype,
+                    schema_dtype
+                ))
