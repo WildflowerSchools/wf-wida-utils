@@ -36,6 +36,121 @@ class TransparentClassroomClient:
             )
             self.api_token = output_json['api_token']
 
+    def fetch_student_data(self):
+        logger.info('Fetching student data from Transparent Classroom for all schools')
+        school_ids = self.fetch_school_ids()
+        logger.info('Fetched {} school IDs'.format(len(school_ids)))
+        student_data_school_dfs = list()
+        for school_id in school_ids:
+            student_data_school_df = self.fetch_student_data_school(school_id)
+            student_data_school_dfs.append(student_data_school_df)
+        student_data_df = pd.concat(student_data_school_dfs, ignore_index=True)
+        return student_data_df
+
+    def fetch_student_data_school(self, school_id):
+        logger.info('Fetching student data from Transparent Classroom for school ID {}'.format(school_id))
+        output_json = self.transparent_classroom_request('children.json', school_id=school_id)
+        student_data_school_df = pd.DataFrame(output_json)
+        student_data_school_df = student_data_school_df.reindex(columns= [
+            'id',
+            'first_name',
+            'last_name',
+            'birth_date',
+            'gender',
+            'hours_string',
+            'dominant_language',
+            'allergies',
+            'ethnicity',
+            'household_income',
+            'approved_adults_string',
+            'emergency_contacts_string',
+            'classroom_ids',
+            'parent_ids',
+            'program',
+            'middle_name',
+            'grade',
+            'last_day',
+            'exit_reason',
+            'student_id',
+            'notes',
+            'exit_survey_id',
+            'exit_notes'
+        ])
+        student_data_school_df.rename(
+            columns= {
+                'id': 'student_id_tc',
+                'first_name': 'student_first_name',
+                'last_name': 'student_last_name',
+                'birth_date': 'student_birth_date',
+                'gender': 'student_gender',
+                'hours_string': 'student_hours_string',
+                'dominant_language': 'student_dominant_language',
+                'allergies': 'student_allergies',
+                'ethnicity': 'student_ethnicity',
+                'household_income': 'student_household_income',
+                'approved_adults_string': 'student_approved_adults_string',
+                'emergency_contacts_string': 'student_emergency_contacts_string',
+                'classroom_ids': 'student_classroom_ids',
+                'parent_ids': 'student_parent_ids',
+                'program': 'student_program',
+                'middle_name': 'student_middle_name',
+                'grade': 'student_grade',
+                'last_day': 'student_last_day',
+                'exit_reason': 'student_exit_reason',
+                'student_id': 'student_id_tc_alt',
+                'notes': 'student_notes',
+                'exit_survey_id': 'student_exit_survey_id',
+                'exit_notes': 'student_exit_notes'
+            },
+            inplace=True
+        )
+        student_data_school_df['student_id_tc'] = student_data_school_df['student_id_tc'].astype('Int64')
+        student_data_school_df['student_first_name'] = student_data_school_df['student_first_name'].astype('string')
+        student_data_school_df['student_last_name'] = student_data_school_df['student_last_name'].astype('string')
+        student_data_school_df['student_birth_date'] = pd.DatetimeIndex(pd.to_datetime(student_data_school_df['student_birth_date'])).date
+        student_data_school_df['student_gender'] = student_data_school_df['student_gender'].astype('string')
+        student_data_school_df['student_hours_string'] = student_data_school_df['student_hours_string'].astype('string')
+        student_data_school_df['student_dominant_language'] = student_data_school_df['student_dominant_language'].astype('string')
+        student_data_school_df['student_allergies'] = student_data_school_df['student_allergies'].astype('string')
+        student_data_school_df['student_household_income'] = student_data_school_df['student_household_income'].astype('string')
+        student_data_school_df['student_approved_adults_string'] = student_data_school_df['student_approved_adults_string'].astype('string')
+        student_data_school_df['student_emergency_contacts_string'] = student_data_school_df['student_emergency_contacts_string'].astype('string')
+        student_data_school_df['student_program'] = student_data_school_df['student_program'].astype('string')
+        student_data_school_df['student_middle_name'] = student_data_school_df['student_middle_name'].astype('string')
+        student_data_school_df['student_grade'] = student_data_school_df['student_grade'].astype('string')
+        student_data_school_df['student_last_day'] = pd.DatetimeIndex(pd.to_datetime(student_data_school_df['student_last_day'])).date
+        student_data_school_df['student_exit_reason'] = student_data_school_df['student_exit_reason'].astype('string')
+        student_data_school_df['student_id_tc_alt'] = student_data_school_df['student_id_tc_alt'].astype('string')
+        student_data_school_df['student_notes'] = student_data_school_df['student_notes'].astype('string')
+        student_data_school_df['student_exit_survey_id'] = student_data_school_df['student_exit_survey_id'].astype('Int64')
+        student_data_school_df['student_exit_notes'] = student_data_school_df['student_exit_notes'].astype('string')
+        student_data_school_df = student_data_school_df.reindex(columns=[
+            'student_id_tc',
+            'student_first_name',
+            'student_middle_name',
+            'student_last_name',
+            'student_birth_date',
+            'student_gender',
+            'student_ethnicity',
+            'student_dominant_language',
+            'student_household_income',
+            'student_grade',
+            'student_classroom_ids',
+            'student_program',
+            'student_hours_string',
+            'student_id_tc_alt',
+            'student_allergies',
+            'student_parent_ids',
+            'student_approved_adults_string',
+            'student_emergency_contacts_string',
+            'student_notes',
+            'student_last_day',
+            'student_exit_reason',
+            'student_exit_survey_id',
+            'student_exit_notes'
+        ])
+        return student_data_school_df
+
     def fetch_school_ids(self):
         output_json = self.transparent_classroom_request('schools.json')
         school_ids = list()
