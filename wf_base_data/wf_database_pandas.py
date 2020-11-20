@@ -1,7 +1,9 @@
 from .database_pandas import DatabasePandas
 from .google_sheets import ingest_student_data_google_sheet
+from .transparent_classroom import TransparentClassroomClient
 import pandas as pd
 from collections import OrderedDict
+import datetime
 import uuid
 import logging
 
@@ -67,6 +69,17 @@ class WildflowerDatabasePandas(DatabasePandas):
         records = ingest_student_data_google_sheet(sheet_id, pull_date)
         num_records = len(records)
         logger.info('Adding {} records from Google Sheet'.format(num_records))
+        self.add_transparent_classroom_student_records(records)
+
+    def pull_transparent_classroom_student_records_transparent_classroom(self, client=None):
+        if client is None:
+            client = client = TransparentClassroomClient()
+        pull_datetime = datetime.datetime.now()
+        records = client.fetch_student_data()
+        records['pull_datetime'] = pull_datetime
+        records['pull_datetime'] = pd.to_datetime(records['pull_datetime'])
+        num_records = len(records)
+        logger.info('Adding {} records from Transparent Classroom'.format(num_records))
         self.add_transparent_classroom_student_records(records)
 
     def add_transparent_classroom_student_records(self, records):

@@ -51,7 +51,9 @@ class TransparentClassroomClient:
         logger.info('Fetching student data from Transparent Classroom for school ID {}'.format(school_id))
         output_json = self.transparent_classroom_request('children.json', school_id=school_id)
         student_data_school_df = pd.DataFrame(output_json)
+        student_data_school_df['school_id_tc'] = int(school_id)
         student_data_school_df = student_data_school_df.reindex(columns= [
+            'school_id_tc',
             'id',
             'first_name',
             'last_name',
@@ -125,6 +127,7 @@ class TransparentClassroomClient:
         student_data_school_df['student_exit_survey_id'] = student_data_school_df['student_exit_survey_id'].astype('Int64')
         student_data_school_df['student_exit_notes'] = student_data_school_df['student_exit_notes'].astype('string')
         student_data_school_df = student_data_school_df.reindex(columns=[
+            'school_id_tc',
             'student_id_tc',
             'student_first_name',
             'student_middle_name',
