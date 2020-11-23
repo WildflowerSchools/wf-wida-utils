@@ -1,6 +1,8 @@
+from .utils import to_date
 from gspread_pandas import Spread, Client
 import pandas as pd
 import json
+import datetime
 import logging
 
 logger = logging.getLogger(__name__)
@@ -24,12 +26,12 @@ def ingest_student_data_google_sheet(sheet_id, pull_date):
     df = spread.sheet_to_df(index=None)
     df['school_id_tc'] = pd.to_numeric(df['school_id']).astype('Int64')
     df['child_raw_dict'] = df['child_raw'].apply(lambda x: json.loads(x))
-    df['student_id_tc'] = df['child_raw_dict'].apply(lambda x: int(x.get('id'))).astype('Int64')
+    df['student_id_tc'] = pd.to_numeric(df['child_raw_dict'].apply(lambda x: int(x.get('id')))).astype('Int64')
     df['pull_datetime'] = pd.to_datetime(pull_date)
     df['student_first_name'] = df['child_raw_dict'].apply(lambda x: x.get('first_name')).astype('string')
     df['student_middle_name'] = df['child_raw_dict'].apply(lambda x: x.get('middle_name')).astype('string')
     df['student_last_name'] = df['child_raw_dict'].apply(lambda x: x.get('last_name')).astype('string')
-    df['student_birth_date'] = pd.DatetimeIndex(pd.to_datetime(df['child_raw_dict'].apply(lambda x: x.get('birth_date')))).date
+    df['student_birth_date'] = df['child_raw_dict'].apply(lambda x: to_date(x.get('birth_date')))
     df['student_gender'] = df['child_raw_dict'].apply(lambda x: x.get('gender')).astype('string')
     df['student_ethnicity'] = df['child_raw_dict'].apply(lambda x: x.get('ethnicity'))
     df['student_dominant_language'] = df['child_raw_dict'].apply(lambda x: x.get('dominant_language')).astype('string')
@@ -44,7 +46,7 @@ def ingest_student_data_google_sheet(sheet_id, pull_date):
     df['student_approved_adults_string'] = df['child_raw_dict'].apply(lambda x: x.get('approved_adults_string')).astype('string')
     df['student_emergency_contacts_string'] = df['child_raw_dict'].apply(lambda x: x.get('emergency_contacts_string')).astype('string')
     df['student_notes'] = df['child_raw_dict'].apply(lambda x: x.get('notes')).astype('string')
-    df['student_last_day'] = pd.DatetimeIndex(pd.to_datetime(df['child_raw_dict'].apply(lambda x: x.get('last_day')))).date
+    df['student_last_day'] = df['child_raw_dict'].apply(lambda x: to_date(x.get('last_day')))
     df['student_exit_reason'] = df['child_raw_dict'].apply(lambda x: x.get('exit_reason')).astype('string')
     df['student_exit_survey_id'] = pd.to_numeric(df['child_raw_dict'].apply(lambda x: x.get('exit_survey_id'))).astype('Int64')
     df['student_exit_notes'] = df['child_raw_dict'].apply(lambda x: x.get('exit_notes')).astype('string')

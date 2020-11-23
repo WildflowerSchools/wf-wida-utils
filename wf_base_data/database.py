@@ -1,3 +1,4 @@
+from .utils import to_date
 import pandas as pd
 import logging
 
@@ -26,7 +27,7 @@ TYPES = {
     },
     'date': {
         'pandas_dtype': 'object',
-        'converter': lambda x: pd.DatetimeIndex(pd.to_datetime(x)).date
+        'converter': lambda x: x.apply(to_date)
     },
     'list': {
         'pandas_dtype': 'object',
