@@ -3,12 +3,13 @@
 Python tools for working with Wildflower Schools base data
 
 ## Tasks
-* Figure out why `student_last_day` ends up being a mix of `NaT` and `NaN` for missing values
-* Figure out why some fields end up being combination of None and Nan
+* Split repo into wf_rdbms and wf_core_data
+* Redesign wf_rdbms around underlying SQL implementation while preserving Pandas implementation
+* Implement wf_rdbms in Postgres
+* Implement wf_rdbms in SQLite
+* Add method(s) to extract the current info for each student
+* Add method(s) to suggest and review student dupes
 * Fix inheritance structure so `Database` init can happen at parent class level
-* Add school ID when pulling student data for multiple schools from Transparent Classroom
-* Add pull datetime when pulling student data from TC and writing to database
-* Add method for pulling student data directly from TC and writing to database
 * Make database structure an OrderedDict so user can specify order of data tables (e.g., for saving to Google sheets)
 * Add method for writing database to Google Sheets
 * Add method for writing database to local file(s)
