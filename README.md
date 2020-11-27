@@ -1,6 +1,6 @@
-# wf_base_data
+# wf_core_data
 
-Python tools for working with Wildflower Schools base data
+Python tools for working with Wildflower Schools core data
 
 ## Tasks
 * Split repo into wf_rdbms and wf_core_data

@@ -1,6 +1,6 @@
-from .database_pandas import DatabasePandas
-from .google_sheets import ingest_student_data_google_sheet
-from .transparent_classroom import TransparentClassroomClient
+from wf_rdbms.database_pandas import DatabasePandas
+from wf_core_data.google_sheets import ingest_student_data_google_sheet
+from wf_core_data.transparent_classroom import TransparentClassroomClient
 import pandas as pd
 from collections import OrderedDict
 import datetime

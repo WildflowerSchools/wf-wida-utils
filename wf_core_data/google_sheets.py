@@ -1,4 +1,4 @@
-from .utils import to_date
+from wf_core_data.utils import to_date
 from gspread_pandas import Spread, Client
 import pandas as pd
 import json

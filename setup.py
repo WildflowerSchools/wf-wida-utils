@@ -6,6 +6,7 @@ VERSION = open(os.path.join(BASEDIR, 'VERSION')).read().strip()
 
 # Dependencies (format is 'PYPI_PACKAGE_NAME[>]=VERSION_NUMBER')
 BASE_DEPENDENCIES = [
+    'wf-rdbms-python>=0.0.1',
     'pandas>=1.1',
     'numpy>=1.19',
     'requests>=2.25',
@@ -25,11 +26,11 @@ BASE_DEPENDENCIES = [
 os.chdir(os.path.normpath(BASEDIR))
 
 setup(
-    name='wf-base-data-python',
+    name='wf-core-data-python',
     packages=find_packages(),
     version=VERSION,
     include_package_data=True,
-    description='Python tools for working with Wildflower Schools base data',
+    description='Python tools for working with Wildflower Schools core data',
     long_description=open('README.md').read(),
     url='https://github.com/tcquinn/wf-base-data-python',
     author='Theodore Quinn',
