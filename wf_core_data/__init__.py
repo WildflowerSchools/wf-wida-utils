@@ -1,1 +1,3 @@
-from wf_core_data.wf_database_pandas import *
+from .google_sheets import *
+from .transparent_classroom import *
+# from .wf_database_pandas import *

@@ -38,26 +38,32 @@ class TransparentClassroomClient:
             )
             self.api_token = output_json['api_token']
 
-    def fetch_student_data(self):
+    def fetch_student_data(self, pull_datetime=None):
+        if pull_datetime is None:
+            pull_datetime = pd.Timestamp.utcnow()
         logger.info('Fetching student data from Transparent Classroom for all schools')
         school_ids = self.fetch_school_ids()
         logger.info('Fetched {} school IDs'.format(len(school_ids)))
         student_data_school_dfs = list()
         for school_id in school_ids:
-            student_data_school_df = self.fetch_student_data_school(school_id)
+            student_data_school_df = self.fetch_student_data_school(school_id, pull_datetime=pull_datetime)
             student_data_school_dfs.append(student_data_school_df)
         student_data_df = pd.concat(student_data_school_dfs, ignore_index=True)
         return student_data_df
 
-    def fetch_student_data_school(self, school_id):
+    def fetch_student_data_school(self, school_id, pull_datetime=None):
+        if pull_datetime is None:
+            pull_datetime = pd.Timestamp.utcnow()
         logger.info('Fetching student data from Transparent Classroom for school ID {}'.format(school_id))
         output_json = self.transparent_classroom_request('children.json', school_id=school_id)
         student_data_school_df = pd.DataFrame(output_json, dtype='object')
         student_data_school_df['school_id_tc'] = int(school_id)
+        student_data_school_df['pull_datetime'] = pull_datetime
         student_data_school_df = student_data_school_df.reindex(
             columns= [
                 'school_id_tc',
                 'id',
+                'pull_datetime',
                 'first_name',
                 'middle_name',
                 'last_name',
@@ -86,59 +92,72 @@ class TransparentClassroomClient:
         student_data_school_df.rename(
             columns= {
                 'id': 'student_id_tc',
-                'first_name': 'student_first_name',
-                'last_name': 'student_last_name',
-                'birth_date': 'student_birth_date',
-                'gender': 'student_gender',
-                'hours_string': 'student_hours_string',
-                'dominant_language': 'student_dominant_language',
-                'allergies': 'student_allergies',
-                'ethnicity': 'student_ethnicity',
-                'household_income': 'student_household_income',
-                'approved_adults_string': 'student_approved_adults_string',
-                'emergency_contacts_string': 'student_emergency_contacts_string',
-                'classroom_ids': 'student_classroom_ids',
-                'parent_ids': 'student_parent_ids',
-                'program': 'student_program',
-                'middle_name': 'student_middle_name',
-                'grade': 'student_grade',
-                'last_day': 'student_last_day',
-                'exit_reason': 'student_exit_reason',
-                'student_id': 'student_id_tc_alt',
-                'notes': 'student_notes',
-                'exit_survey_id': 'student_exit_survey_id',
-                'exit_notes': 'student_exit_notes'
+                'first_name': 'student_first_name_tc',
+                'middle_name': 'student_middle_name_tc',
+                'last_name': 'student_last_name_tc',
+                'birth_date': 'student_birth_date_tc',
+                'gender': 'student_gender_tc',
+                'hours_string': 'student_hours_string_tc',
+                'dominant_language': 'student_dominant_language_tc',
+                'allergies': 'student_allergies_tc',
+                'ethnicity': 'student_ethnicity_tc',
+                'household_income': 'student_household_income_tc',
+                'approved_adults_string': 'student_approved_adults_string_tc',
+                'emergency_contacts_string': 'student_emergency_contacts_string_tc',
+                'classroom_ids': 'student_classroom_ids_tc',
+                'parent_ids': 'student_parent_ids_tc',
+                'program': 'student_program_tc',
+                'middle_name': 'student_middle_name_tc',
+                'grade': 'student_grade_tc',
+                'last_day': 'student_last_day_tc',
+                'exit_reason': 'student_exit_reason_tc',
+                'student_id': 'student_id_alt_tc',
+                'notes': 'student_notes_tc',
+                'exit_survey_id': 'student_exit_survey_id_tc',
+                'exit_notes': 'student_exit_notes_tc'
             },
             inplace=True
         )
-        student_data_school_df['student_birth_date'] = student_data_school_df['student_birth_date'].apply(to_date)
-        student_data_school_df['student_last_day'] = student_data_school_df['student_last_day'].apply(to_date)
+        student_data_school_df['student_birth_date_tc'] = student_data_school_df['student_birth_date_tc'].apply(to_date)
+        student_data_school_df['student_last_day_tc'] = student_data_school_df['student_last_day_tc'].apply(to_date)
         student_data_school_df = student_data_school_df.astype({
             'school_id_tc': 'Int64',
             'student_id_tc': 'Int64',
-            'student_first_name': 'string',
-            'student_middle_name': 'string',
-            'student_last_name': 'string',
-            'student_birth_date': 'object',
-            'student_gender': 'string',
-            'student_ethnicity': 'object',
-            'student_dominant_language': 'string',
-            'student_household_income': 'string',
-            'student_grade': 'string',
-            'student_classroom_ids': 'object',
-            'student_program': 'string',
-            'student_hours_string': 'string',
-            'student_id_tc_alt': 'string',
-            'student_allergies': 'string',
-            'student_parent_ids': 'object',
-            'student_approved_adults_string': 'string',
-            'student_emergency_contacts_string': 'string',
-            'student_notes': 'string',
-            'student_last_day': 'object',
-            'student_exit_reason': 'string',
-            'student_exit_survey_id': 'Int64',
-            'student_exit_notes': 'string'
+            'student_first_name_tc': 'string',
+            'student_middle_name_tc': 'string',
+            'student_last_name_tc': 'string',
+            'student_birth_date_tc': 'object',
+            'student_gender_tc': 'string',
+            'student_ethnicity_tc': 'object',
+            'student_dominant_language_tc': 'string',
+            'student_household_income_tc': 'string',
+            'student_grade_tc': 'string',
+            'student_classroom_ids_tc': 'object',
+            'student_program_tc': 'string',
+            'student_hours_string_tc': 'string',
+            'student_id_alt_tc': 'string',
+            'student_allergies_tc': 'string',
+            'student_parent_ids_tc': 'object',
+            'student_approved_adults_string_tc': 'string',
+            'student_emergency_contacts_string_tc': 'string',
+            'student_notes_tc': 'string',
+            'student_last_day_tc': 'object',
+            'student_exit_reason_tc': 'string',
+            'student_exit_survey_id_tc': 'Int64',
+            'student_exit_notes_tc': 'string'
         })
+        student_data_school_df['student_ethnicity_tc'] = student_data_school_df['student_ethnicity_tc'].where(
+            pd.notnull(student_data_school_df['student_ethnicity_tc']),
+            None
+        )
+        student_data_school_df['student_classroom_ids_tc'] = student_data_school_df['student_classroom_ids_tc'].where(
+            pd.notnull(student_data_school_df['student_classroom_ids_tc']),
+            None
+        )
+        student_data_school_df['student_parent_ids_tc'] = student_data_school_df['student_parent_ids_tc'].where(
+            pd.notnull(student_data_school_df['student_parent_ids_tc']),
+            None
+        )
         return student_data_school_df
 
     def fetch_school_ids(self):
@@ -155,25 +174,25 @@ class TransparentClassroomClient:
         school_data_df = school_data_df.loc[school_data_df['type'] == "School"].copy()
         school_data_df.rename(
             columns= {
-                'id': 'tc_school_id',
-                'name': 'tc_school_name',
-                'address': 'tc_school_address',
-                'phone': 'tc_school_phone',
-                'time_zone': 'tc_school_time_zone'
+                'id': 'school_id_tc',
+                'name': 'school_name_tc',
+                'address': 'school_address_tc',
+                'phone': 'school_phone_tc',
+                'time_zone': 'school_time_zone_tc'
             },
             inplace=True
         )
-        school_data_df['tc_school_id'] = school_data_df['tc_school_id'].astype('Int64')
-        school_data_df['tc_school_name'] = school_data_df['tc_school_name'].astype('string')
-        school_data_df['tc_school_address'] = school_data_df['tc_school_address'].astype('string')
-        school_data_df['tc_school_phone'] = school_data_df['tc_school_phone'].astype('string')
-        school_data_df['tc_school_time_zone'] = school_data_df['tc_school_time_zone'].astype('string')
+        school_data_df['school_id_tc'] = school_data_df['school_id_tc'].astype('Int64')
+        school_data_df['school_name_tc'] = school_data_df['school_name_tc'].astype('string')
+        school_data_df['school_address_tc'] = school_data_df['school_address_tc'].astype('string')
+        school_data_df['school_phone_tc'] = school_data_df['school_phone_tc'].astype('string')
+        school_data_df['school_time_zone_tc'] = school_data_df['school_time_zone_tc'].astype('string')
         school_data_df = school_data_df.reindex(columns=[
-                'tc_school_id',
-                'tc_school_name',
-                'tc_school_address',
-                'tc_school_phone',
-                'tc_school_time_zone'
+                'school_id_tc',
+                'school_name_tc',
+                'school_address_tc',
+                'school_phone_tc',
+                'school_time_zone_tc'
         ])
         return school_data_df
 
