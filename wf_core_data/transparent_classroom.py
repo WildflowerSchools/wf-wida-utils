@@ -87,6 +87,9 @@ class TransparentClassroomClient:
             ))
             json_output = self.transparent_classroom_request(
                 'children.json',
+                params={
+                    'session_id': session_id
+                },
                 school_id=school_id
             )
         else:
@@ -95,9 +98,6 @@ class TransparentClassroomClient:
             ))
             json_output = self.transparent_classroom_request(
                 'children.json',
-                params={
-                    'session_id': session_id
-                },
                 school_id=school_id
             )
         if not isinstance(json_output, list):
