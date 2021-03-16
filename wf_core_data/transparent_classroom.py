@@ -49,6 +49,10 @@ class TransparentClassroomClient:
         logger.info('Fetched {} school IDs'.format(len(school_ids)))
         data = {
             'schools': school_data,
+            'classrooms': list(),
+            'users': list(),
+            'teachers_default_classrooms': list(),
+            'teachers_accessible_classrooms': list(),
             'sessions': list(),
             'students': list(),
             'students_classrooms': list(),
@@ -59,6 +63,10 @@ class TransparentClassroomClient:
                 school_id=school_id,
                 pull_datetime=pull_datetime
             )
+            data['classrooms'].extend(data_school['classrooms'])
+            data['users'].extend(data_school['users'])
+            data['teachers_default_classrooms'].extend(data_school['teachers_default_classrooms'])
+            data['teachers_accessible_classrooms'].extend(data_school['teachers_accessible_classrooms'])
             data['sessions'].extend(data_school['sessions'])
             data['students'].extend(data_school['students'])
             data['students_classrooms'].extend(data_school['students_classrooms'])
@@ -73,18 +81,77 @@ class TransparentClassroomClient:
         logger.info('Fetching all data from Transparent Classroom for school ID {} for all sessions'.format(
             school_id
         ))
+        classroom_data_school = self.fetch_classroom_data_school(
+            school_id=school_id,
+            pull_datetime=pull_datetime
+        )
         session_data_school = self.fetch_session_data_school(
             school_id=school_id,
             pull_datetime=pull_datetime
         )
-        session_ids = [session.get('session_id_tc') for session in session_data_school]
-        logger.info('Fetched {} session IDs'.format(len(session_ids)))
         data_school = {
+            'classrooms': classroom_data_school,
+            'users': list(),
+            'teachers_default_classrooms': list(),
+            'teachers_accessible_classrooms': list(),
             'sessions': session_data_school,
             'students': list(),
             'students_classrooms': list(),
             'students_parents': list()
         }
+        logger.info('Fetching user data from Transparent Classroom for school ID {}'.format(
+            school_id
+        ))
+        json_output = self.transparent_classroom_request(
+            'users.json',
+            school_id=school_id
+        )
+        if not isinstance(json_output, list):
+            raise ValueError('Received unexpected response from Transparent Classroom: {}'.format(
+                json_output
+            ))
+        for datum in json_output:
+            user_datum = OrderedDict([
+                ('school_id_tc', school_id),
+                ('user_id_tc', datum.get('id')),
+                ('pull_datetime', pull_datetime),
+                ('user_first_name_tc', datum.get('first_name')),
+                ('user_last_name_tc', datum.get('last_name')),
+                ('user_email_tc', datum.get('email')),
+                ('user_roles_tc', datum.get('roles'))
+            ])
+            data_school['users'].append(user_datum)
+            if 'teacher' in datum.get('roles', []):
+                logger.info('Fetching teacher data from Transparent Classroom for school ID {} and user id {}'.format(
+                    school_id,
+                    datum.get('id')
+                ))
+                teacher_datum = self.transparent_classroom_request(
+                    'users/{}.json'.format(datum.get('id')),
+                    school_id=school_id
+                )
+                if not isinstance(teacher_datum, dict):
+                    raise ValueError('Received unexpected response from Transparent Classroom: {}'.format(
+                        teacher_datum
+                    ))
+                if teacher_datum.get('default_classroom_id') is not None:
+                    teacher_default_classroom_datum = OrderedDict([
+                        ('school_id_tc', school_id),
+                        ('user_id_tc', teacher_datum.get('id')),
+                        ('pull_datetime', pull_datetime),
+                        ('teacher_default_classroom_id_tc', teacher_datum.get('default_classroom_id'))
+                    ])
+                    data_school['teachers_default_classrooms'].append(teacher_default_classroom_datum)
+                for accessible_classroom_id in teacher_datum.get('accessible_classroom_ids', []):
+                    teacher_accessible_classroom_datum = OrderedDict([
+                        ('school_id_tc', school_id),
+                        ('user_id_tc', teacher_datum.get('id')),
+                        ('pull_datetime', pull_datetime),
+                        ('teacher_accessible_classroom_id_tc', accessible_classroom_id)
+                    ])
+                    data_school['teachers_accessible_classrooms'].append(teacher_accessible_classroom_datum)
+        session_ids = [session.get('session_id_tc') for session in session_data_school]
+        logger.info('Fetched {} session IDs'.format(len(session_ids)))
         student_ids_fetched = set()
         for session_id in session_ids:
             logger.info('Fetching all data from Transparent Classroom for school ID {} and session ID {}'.format(
@@ -179,6 +246,37 @@ class TransparentClassroomClient:
                 school_data.append(school_datum)
         return school_data
 
+    def fetch_classroom_data_school(self, school_id, pull_datetime=None):
+        school_id = int(school_id)
+        pull_datetime = wf_core_data.utils.to_datetime(pull_datetime)
+        if pull_datetime is None:
+            pull_datetime = datetime.datetime.now(tz=datetime.timezone.utc)
+        logger.info('Fetching classroom data from Transparent Classroom for school ID {}'.format(school_id))
+        json_output = self.transparent_classroom_request(
+            'classrooms.json',
+                params={
+                    'show_inactive': True
+                },
+            school_id=school_id
+        )
+        if not isinstance(json_output, list):
+            raise ValueError('Received unexpected response from Transparent Classroom: {}'.format(
+                json_output
+            ))
+        classroom_data_school=list()
+        for datum in json_output:
+            classroom_datum = OrderedDict([
+                ('school_id_tc', school_id),
+                ('classroom_id_tc', datum.get('id')),
+                ('pull_datetime', pull_datetime),
+                ('classroom_name_tc', datum.get('name')),
+                ('classroom_lesson_set_id_tc', datum.get('lesson_set_id')),
+                ('classroom_level_tc', datum.get('level')),
+                ('classroom_active_tc', wf_core_data.utils.to_boolean(datum.get('active')))
+            ])
+            classroom_data_school.append(classroom_datum)
+        return classroom_data_school
+
     def fetch_session_ids(self, school_id):
         session_data_school = self.fetch_session_data_school(
             school_id=school_id,
@@ -257,6 +355,63 @@ def convert_school_data_to_df(school_data):
         'school_time_zone_tc': 'string'
     })
     return school_data_df
+
+def convert_classroom_data_to_df(classroom_data):
+    classroom_data_df = pd.DataFrame(
+        classroom_data,
+        dtype='object'
+    )
+    classroom_data_df['pull_datetime'] = pd.to_datetime(classroom_data_df['pull_datetime'])
+    classroom_data_df = classroom_data_df.astype({
+        'school_id_tc': 'int',
+        'classroom_id_tc': 'int',
+        'classroom_name_tc': 'string',
+        'classroom_lesson_set_id_tc': 'Int64',
+        'classroom_level_tc': 'string',
+        'classroom_active_tc': 'bool'
+    })
+    return classroom_data_df
+
+def convert_user_data_to_df(user_data):
+    user_data_df = pd.DataFrame(
+        user_data,
+        dtype='object'
+    )
+    user_data_df['pull_datetime'] = pd.to_datetime(user_data_df['pull_datetime'])
+    user_data_df = user_data_df.astype({
+        'school_id_tc': 'int',
+        'user_id_tc': 'int',
+        'user_first_name_tc': 'string',
+        'user_last_name_tc': 'string',
+        'user_email_tc': 'string',
+    })
+    return user_data_df
+
+def convert_teacher_default_classroom_data_to_df(teacher_default_classroom_data):
+    teacher_default_classroom_data_df = pd.DataFrame(
+        teacher_default_classroom_data,
+        dtype='object'
+    )
+    teacher_default_classroom_data_df['pull_datetime'] = pd.to_datetime(teacher_default_classroom_data_df['pull_datetime'])
+    teacher_default_classroom_data_df = teacher_default_classroom_data_df.astype({
+        'school_id_tc': 'int',
+        'user_id_tc': 'int',
+        'teacher_default_classroom_id_tc': 'int'
+    })
+    return teacher_default_classroom_data_df
+
+def convert_teacher_accessible_classroom_data_to_df(teacher_accessible_classroom_data):
+    teacher_accessible_classroom_data_df = pd.DataFrame(
+        teacher_accessible_classroom_data,
+        dtype='object'
+    )
+    teacher_accessible_classroom_data_df['pull_datetime'] = pd.to_datetime(teacher_accessible_classroom_data_df['pull_datetime'])
+    teacher_accessible_classroom_data_df = teacher_accessible_classroom_data_df.astype({
+        'school_id_tc': 'int',
+        'user_id_tc': 'int',
+        'teacher_accessible_classroom_id_tc': 'int'
+    })
+    return teacher_accessible_classroom_data_df
 
 def convert_session_data_to_df(session_data):
     session_data_df = pd.DataFrame(
