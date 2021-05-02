@@ -153,8 +153,63 @@ class TransparentClassroomClient:
         session_ids = [session.get('session_id_tc') for session in session_data_school]
         logger.info('Fetched {} session IDs'.format(len(session_ids)))
         student_ids_fetched = set()
+        logger.info('Fetching student data from Transparent Classroom for school ID {} for all sessions'.format(
+            school_id
+        ))
+        json_output = self.transparent_classroom_request(
+            'children.json',
+            params={
+                'session_id': 'all'
+            },
+            school_id=school_id
+        )
+        if not isinstance(json_output, list):
+            raise ValueError('Received unexpected response from Transparent Classroom: {}'.format(
+                json_output
+            ))
+        for datum in json_output:
+            if datum.get('id') in student_ids_fetched:
+                continue
+            student_ids_fetched.add(datum.get('id'))
+            student_datum = OrderedDict([
+                ('school_id_tc', school_id),
+                ('student_id_tc', datum.get('id')),
+                ('pull_datetime', pull_datetime),
+                ('student_first_name_tc', datum.get('first_name')),
+                ('student_middle_name_tc', datum.get('middle_name')),
+                ('student_last_name_tc', datum.get('last_name')),
+                ('student_birth_date_tc', wf_core_data.utils.to_date(datum.get('birth_date'))),
+                ('student_gender_tc', datum.get('gender')),
+                ('student_hours_string_tc', datum.get('hours_string')),
+                ('student_dominant_language_tc', datum.get('dominant_language')),
+                ('student_allergies_tc', datum.get('allergies')),
+                ('student_ethnicity_tc', datum.get('ethnicity')),
+                ('student_household_income_tc', datum.get('household_income')),
+                ('student_approved_adults_string_tc', datum.get('approved_adults_string')),
+                ('student_emergency_contacts_string_tc', datum.get('emergency_contacts_string')),
+                ('student_program_tc', datum.get('program')),
+                ('student_grade_tc', datum.get('grade')),
+                ('student_last_day_tc', wf_core_data.utils.to_date(datum.get('last_day'))),
+                ('student_exit_reason_tc', datum.get('exit_reason')),
+                ('student_id_alt_tc', datum.get('student_id')),
+                ('student_notes_tc', datum.get('notes')),
+                ('student_exit_survey_id_tc', datum.get('exit_survey_id')),
+                ('student_exit_notes_tc', datum.get('exit_notes'))
+            ])
+            data_school['students'].append(student_datum)
+            for parent_id in datum.get('parent_ids', []):
+                student_parent_datum = OrderedDict([
+                    ('school_id_tc', school_id),
+                    ('student_id_tc', datum.get('id')),
+                    ('pull_datetime', pull_datetime),
+                    ('parent_id_tc', parent_id)
+                ])
+                data_school['students_parents'].append(student_parent_datum)
+        logger.info('Fetching student classroom association data from Transparent Classroom for school ID {} for each session'.format(
+            school_id
+        ))
         for session_id in session_ids:
-            logger.info('Fetching all data from Transparent Classroom for school ID {} and session ID {}'.format(
+            logger.info('Fetching student classroom association data from Transparent Classroom for school ID {} and session ID {}'.format(
                 school_id,
                 session_id
             ))
@@ -170,51 +225,15 @@ class TransparentClassroomClient:
                     json_output
                 ))
             for datum in json_output:
-                if datum.get('id') in student_ids_fetched:
-                    continue
-                student_ids_fetched.add(datum.get('id'))
-                student_datum = OrderedDict([
-                    ('school_id_tc', school_id),
-                    ('student_id_tc', datum.get('id')),
-                    ('pull_datetime', pull_datetime),
-                    ('student_first_name_tc', datum.get('first_name')),
-                    ('student_middle_name_tc', datum.get('middle_name')),
-                    ('student_last_name_tc', datum.get('last_name')),
-                    ('student_birth_date_tc', wf_core_data.utils.to_date(datum.get('birth_date'))),
-                    ('student_gender_tc', datum.get('gender')),
-                    ('student_hours_string_tc', datum.get('hours_string')),
-                    ('student_dominant_language_tc', datum.get('dominant_language')),
-                    ('student_allergies_tc', datum.get('allergies')),
-                    ('student_ethnicity_tc', datum.get('ethnicity')),
-                    ('student_household_income_tc', datum.get('household_income')),
-                    ('student_approved_adults_string_tc', datum.get('approved_adults_string')),
-                    ('student_emergency_contacts_string_tc', datum.get('emergency_contacts_string')),
-                    ('student_program_tc', datum.get('program')),
-                    ('student_grade_tc', datum.get('grade')),
-                    ('student_last_day_tc', wf_core_data.utils.to_date(datum.get('last_day'))),
-                    ('student_exit_reason_tc', datum.get('exit_reason')),
-                    ('student_id_alt_tc', datum.get('student_id')),
-                    ('student_notes_tc', datum.get('notes')),
-                    ('student_exit_survey_id_tc', datum.get('exit_survey_id')),
-                    ('student_exit_notes_tc', datum.get('exit_notes'))
-                ])
-                data_school['students'].append(student_datum)
                 for classroom_id in datum.get('classroom_ids', []):
                     student_classroom_datum = OrderedDict([
                         ('school_id_tc', school_id),
                         ('student_id_tc', datum.get('id')),
                         ('pull_datetime', pull_datetime),
+                        ('session_id_tc', session_id),
                         ('classroom_id_tc', classroom_id)
                     ])
                     data_school['students_classrooms'].append(student_classroom_datum)
-                for parent_id in datum.get('parent_ids', []):
-                    student_parent_datum = OrderedDict([
-                        ('school_id_tc', school_id),
-                        ('student_id_tc', datum.get('id')),
-                        ('pull_datetime', pull_datetime),
-                        ('parent_id_tc', parent_id)
-                    ])
-                    data_school['students_parents'].append(student_parent_datum)
         return data_school
 
     def fetch_school_ids(self):
@@ -470,6 +489,7 @@ def convert_student_classroom_data_to_df(student_classroom_data):
     student_classroom_data_df = student_classroom_data_df.astype({
             'school_id_tc': 'int',
             'student_id_tc': 'int',
+            'session_id_tc': 'int',
             'classroom_id_tc': 'int'
     })
     return student_classroom_data_df
