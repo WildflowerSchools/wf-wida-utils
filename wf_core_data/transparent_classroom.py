@@ -81,159 +81,56 @@ class TransparentClassroomClient:
         logger.info('Fetching all data from Transparent Classroom for school ID {} for all sessions'.format(
             school_id
         ))
-        classroom_data_school = self.fetch_classroom_data_school(
-            school_id=school_id,
-            pull_datetime=pull_datetime
-        )
         session_data_school = self.fetch_session_data_school(
             school_id=school_id,
             pull_datetime=pull_datetime
         )
-        data_school = {
-            'classrooms': classroom_data_school,
-            'users': list(),
-            'teachers_default_classrooms': list(),
-            'teachers_accessible_classrooms': list(),
-            'sessions': session_data_school,
-            'students': list(),
-            'students_classrooms': list(),
-            'students_parents': list()
-        }
-        logger.info('Fetching user data from Transparent Classroom for school ID {}'.format(
-            school_id
-        ))
-        json_output = self.transparent_classroom_request(
-            'users.json',
-            school_id=school_id
+        classroom_data_school = self.fetch_classroom_data_school(
+            school_id=school_id,
+            pull_datetime=pull_datetime
         )
-        if not isinstance(json_output, list):
-            raise ValueError('Received unexpected response from Transparent Classroom: {}'.format(
-                json_output
-            ))
-        for datum in json_output:
-            user_datum = OrderedDict([
-                ('school_id_tc', school_id),
-                ('user_id_tc', datum.get('id')),
-                ('pull_datetime', pull_datetime),
-                ('user_first_name_tc', datum.get('first_name')),
-                ('user_last_name_tc', datum.get('last_name')),
-                ('user_email_tc', datum.get('email')),
-                ('user_roles_tc', datum.get('roles'))
-            ])
-            data_school['users'].append(user_datum)
-            if 'teacher' in datum.get('roles', []):
-                logger.info('Fetching teacher data from Transparent Classroom for school ID {} and user id {}'.format(
-                    school_id,
-                    datum.get('id')
-                ))
-                teacher_datum = self.transparent_classroom_request(
-                    'users/{}.json'.format(datum.get('id')),
-                    school_id=school_id
+        user_data_school = self.fetch_user_data_school(
+            school_id=school_id,
+            pull_datetime=pull_datetime
+        )
+        student_data_school, student_parent_data_school = self.fetch_student_data_school(
+            school_id=school_id,
+            pull_datetime=pull_datetime
+        )
+        teacher_default_classroom_data = list()
+        teacher_accessible_classroom_data=list()
+        for user_datum in user_data_school:
+            if 'teacher' in user_datum.get('user_roles_tc', []):
+                teacher_default_classroom_data_teacher, teacher_accessible_classroom_data_teacher = self.fetch_teacher_data(
+                    school_id=school_id,
+                    user_id=user_datum['user_id_tc'],
+                    pull_datetime=pull_datetime
                 )
-                if not isinstance(teacher_datum, dict):
-                    raise ValueError('Received unexpected response from Transparent Classroom: {}'.format(
-                        teacher_datum
-                    ))
-                if teacher_datum.get('default_classroom_id') is not None:
-                    teacher_default_classroom_datum = OrderedDict([
-                        ('school_id_tc', school_id),
-                        ('user_id_tc', teacher_datum.get('id')),
-                        ('pull_datetime', pull_datetime),
-                        ('teacher_default_classroom_id_tc', teacher_datum.get('default_classroom_id'))
-                    ])
-                    data_school['teachers_default_classrooms'].append(teacher_default_classroom_datum)
-                for accessible_classroom_id in teacher_datum.get('accessible_classroom_ids', []):
-                    teacher_accessible_classroom_datum = OrderedDict([
-                        ('school_id_tc', school_id),
-                        ('user_id_tc', teacher_datum.get('id')),
-                        ('pull_datetime', pull_datetime),
-                        ('teacher_accessible_classroom_id_tc', accessible_classroom_id)
-                    ])
-                    data_school['teachers_accessible_classrooms'].append(teacher_accessible_classroom_datum)
+                teacher_default_classroom_data.extend(teacher_default_classroom_data_teacher)
+                teacher_accessible_classroom_data.extend(teacher_accessible_classroom_data_teacher)
         session_ids = [session.get('session_id_tc') for session in session_data_school]
         logger.info('Fetched {} session IDs'.format(len(session_ids)))
-        student_ids_fetched = set()
-        logger.info('Fetching student data from Transparent Classroom for school ID {} for all sessions'.format(
-            school_id
-        ))
-        json_output = self.transparent_classroom_request(
-            'children.json',
-            params={
-                'session_id': 'all'
-            },
-            school_id=school_id
-        )
-        if not isinstance(json_output, list):
-            raise ValueError('Received unexpected response from Transparent Classroom: {}'.format(
-                json_output
-            ))
-        for datum in json_output:
-            if datum.get('id') in student_ids_fetched:
-                continue
-            student_ids_fetched.add(datum.get('id'))
-            student_datum = OrderedDict([
-                ('school_id_tc', school_id),
-                ('student_id_tc', datum.get('id')),
-                ('pull_datetime', pull_datetime),
-                ('student_first_name_tc', datum.get('first_name')),
-                ('student_middle_name_tc', datum.get('middle_name')),
-                ('student_last_name_tc', datum.get('last_name')),
-                ('student_birth_date_tc', wf_core_data.utils.to_date(datum.get('birth_date'))),
-                ('student_gender_tc', datum.get('gender')),
-                ('student_hours_string_tc', datum.get('hours_string')),
-                ('student_dominant_language_tc', datum.get('dominant_language')),
-                ('student_allergies_tc', datum.get('allergies')),
-                ('student_ethnicity_tc', datum.get('ethnicity')),
-                ('student_household_income_tc', datum.get('household_income')),
-                ('student_approved_adults_string_tc', datum.get('approved_adults_string')),
-                ('student_emergency_contacts_string_tc', datum.get('emergency_contacts_string')),
-                ('student_program_tc', datum.get('program')),
-                ('student_grade_tc', datum.get('grade')),
-                ('student_last_day_tc', wf_core_data.utils.to_date(datum.get('last_day'))),
-                ('student_exit_reason_tc', datum.get('exit_reason')),
-                ('student_id_alt_tc', datum.get('student_id')),
-                ('student_notes_tc', datum.get('notes')),
-                ('student_exit_survey_id_tc', datum.get('exit_survey_id')),
-                ('student_exit_notes_tc', datum.get('exit_notes'))
-            ])
-            data_school['students'].append(student_datum)
-            for parent_id in datum.get('parent_ids', []):
-                student_parent_datum = OrderedDict([
-                    ('school_id_tc', school_id),
-                    ('student_id_tc', datum.get('id')),
-                    ('pull_datetime', pull_datetime),
-                    ('parent_id_tc', parent_id)
-                ])
-                data_school['students_parents'].append(student_parent_datum)
         logger.info('Fetching student classroom association data from Transparent Classroom for school ID {} for each session'.format(
             school_id
         ))
+        student_classroom_data = list()
         for session_id in session_ids:
-            logger.info('Fetching student classroom association data from Transparent Classroom for school ID {} and session ID {}'.format(
-                school_id,
-                session_id
-            ))
-            json_output = self.transparent_classroom_request(
-                'children.json',
-                params={
-                    'session_id': session_id
-                },
-                school_id=school_id
+            student_classroom_session_data = self.fetch_student_classroom_session_data(
+                school_id=school_id,
+                session_id=session_id,
+                pull_datetime=pull_datetime
             )
-            if not isinstance(json_output, list):
-                raise ValueError('Received unexpected response from Transparent Classroom: {}'.format(
-                    json_output
-                ))
-            for datum in json_output:
-                for classroom_id in datum.get('classroom_ids', []):
-                    student_classroom_datum = OrderedDict([
-                        ('school_id_tc', school_id),
-                        ('student_id_tc', datum.get('id')),
-                        ('pull_datetime', pull_datetime),
-                        ('session_id_tc', session_id),
-                        ('classroom_id_tc', classroom_id)
-                    ])
-                    data_school['students_classrooms'].append(student_classroom_datum)
+            student_classroom_data.extend(student_classroom_session_data)
+        data_school = {
+            'classrooms': classroom_data_school,
+            'users': user_data_school,
+            'teachers_default_classrooms': teacher_default_classroom_data,
+            'teachers_accessible_classrooms': teacher_accessible_classroom_data,
+            'sessions': session_data_school,
+            'students': student_data_school,
+            'students_classrooms': student_classroom_data,
+            'students_parents': student_parent_data_school
+        }
         return data_school
 
     def fetch_school_ids(self):
@@ -330,6 +227,166 @@ class TransparentClassroomClient:
             ])
             session_data_school.append(session_datum)
         return session_data_school
+
+    def fetch_user_data_school(self, school_id, pull_datetime=None):
+        school_id = int(school_id)
+        pull_datetime = wf_core_data.utils.to_datetime(pull_datetime)
+        if pull_datetime is None:
+            pull_datetime = datetime.datetime.now(tz=datetime.timezone.utc)
+        logger.info('Fetching user data from Transparent Classroom for school ID {}'.format(
+            school_id
+        ))
+        json_output = self.transparent_classroom_request(
+            'users.json',
+            school_id=school_id
+        )
+        if not isinstance(json_output, list):
+            raise ValueError('Received unexpected response from Transparent Classroom: {}'.format(
+                json_output
+            ))
+        user_data_school = list()
+        for datum in json_output:
+            user_datum = OrderedDict([
+                ('school_id_tc', school_id),
+                ('user_id_tc', datum.get('id')),
+                ('pull_datetime', pull_datetime),
+                ('user_first_name_tc', datum.get('first_name')),
+                ('user_last_name_tc', datum.get('last_name')),
+                ('user_email_tc', datum.get('email')),
+                ('user_roles_tc', datum.get('roles'))
+            ])
+            user_data_school.append(user_datum)
+        return user_data_school
+
+    def fetch_teacher_data(self, school_id, user_id, pull_datetime=None):
+        school_id = int(school_id)
+        user_id = int(user_id)
+        pull_datetime = wf_core_data.utils.to_datetime(pull_datetime)
+        if pull_datetime is None:
+            pull_datetime = datetime.datetime.now(tz=datetime.timezone.utc)
+        logger.info('Fetching teacher data from Transparent Classroom for school ID {} and user id {}'.format(
+            school_id,
+            user_id
+        ))
+        teacher_datum = self.transparent_classroom_request(
+            'users/{}.json'.format(user_id),
+            school_id=school_id
+        )
+        if not isinstance(teacher_datum, dict):
+            raise ValueError('Received unexpected response from Transparent Classroom: {}'.format(
+                teacher_datum
+            ))
+        teacher_default_classroom_data = list()
+        teacher_accessible_classroom_data = list()
+        if teacher_datum.get('default_classroom_id') is not None:
+            teacher_default_classroom_datum = OrderedDict([
+                ('school_id_tc', school_id),
+                ('user_id_tc', teacher_datum.get('id')),
+                ('pull_datetime', pull_datetime),
+                ('teacher_default_classroom_id_tc', teacher_datum.get('default_classroom_id'))
+            ])
+            teacher_default_classroom_data.append(teacher_default_classroom_datum)
+        for accessible_classroom_id in teacher_datum.get('accessible_classroom_ids', []):
+            teacher_accessible_classroom_datum = OrderedDict([
+                ('school_id_tc', school_id),
+                ('user_id_tc', teacher_datum.get('id')),
+                ('pull_datetime', pull_datetime),
+                ('teacher_accessible_classroom_id_tc', accessible_classroom_id)
+            ])
+            teacher_accessible_classroom_data.append(teacher_accessible_classroom_datum)
+        return teacher_default_classroom_data, teacher_accessible_classroom_data
+
+    def fetch_student_data_school(self, school_id, pull_datetime=None):
+        school_id = int(school_id)
+        pull_datetime = wf_core_data.utils.to_datetime(pull_datetime)
+        if pull_datetime is None:
+            pull_datetime = datetime.datetime.now(tz=datetime.timezone.utc)
+        logger.info('Fetching student data from Transparent Classroom for school ID {} for all sessions'.format(
+            school_id
+        ))
+        json_output = self.transparent_classroom_request(
+            'children.json',
+            params={
+                'session_id': 'all'
+            },
+            school_id=school_id
+        )
+        if not isinstance(json_output, list):
+            raise ValueError('Received unexpected response from Transparent Classroom: {}'.format(
+                json_output
+            ))
+        student_data_school = list()
+        student_parent_data_school = list()
+        for datum in json_output:
+            student_datum = OrderedDict([
+                ('school_id_tc', school_id),
+                ('student_id_tc', datum.get('id')),
+                ('pull_datetime', pull_datetime),
+                ('student_first_name_tc', datum.get('first_name')),
+                ('student_middle_name_tc', datum.get('middle_name')),
+                ('student_last_name_tc', datum.get('last_name')),
+                ('student_birth_date_tc', wf_core_data.utils.to_date(datum.get('birth_date'))),
+                ('student_gender_tc', datum.get('gender')),
+                ('student_hours_string_tc', datum.get('hours_string')),
+                ('student_dominant_language_tc', datum.get('dominant_language')),
+                ('student_allergies_tc', datum.get('allergies')),
+                ('student_ethnicity_tc', datum.get('ethnicity')),
+                ('student_household_income_tc', datum.get('household_income')),
+                ('student_approved_adults_string_tc', datum.get('approved_adults_string')),
+                ('student_emergency_contacts_string_tc', datum.get('emergency_contacts_string')),
+                ('student_program_tc', datum.get('program')),
+                ('student_grade_tc', datum.get('grade')),
+                ('student_last_day_tc', wf_core_data.utils.to_date(datum.get('last_day'))),
+                ('student_exit_reason_tc', datum.get('exit_reason')),
+                ('student_id_alt_tc', datum.get('student_id')),
+                ('student_notes_tc', datum.get('notes')),
+                ('student_exit_survey_id_tc', datum.get('exit_survey_id')),
+                ('student_exit_notes_tc', datum.get('exit_notes'))
+            ])
+            student_data_school.append(student_datum)
+            for parent_id in datum.get('parent_ids', []):
+                student_parent_datum = OrderedDict([
+                    ('school_id_tc', school_id),
+                    ('student_id_tc', datum.get('id')),
+                    ('pull_datetime', pull_datetime),
+                    ('parent_id_tc', parent_id)
+                ])
+                student_parent_data_school.append(student_parent_datum)
+        return student_data_school, student_parent_data_school
+
+    def fetch_student_classroom_session_data(self, school_id, session_id, pull_datetime=None):
+        school_id = int(school_id)
+        session_id = int(session_id)
+        pull_datetime = wf_core_data.utils.to_datetime(pull_datetime)
+        if pull_datetime is None:
+            pull_datetime = datetime.datetime.now(tz=datetime.timezone.utc)
+        logger.info('Fetching student classroom association data from Transparent Classroom for school ID {} and session ID {}'.format(
+            school_id,
+            session_id
+        ))
+        json_output = self.transparent_classroom_request(
+            'children.json',
+            params={
+                'session_id': session_id
+            },
+            school_id=school_id
+        )
+        if not isinstance(json_output, list):
+            raise ValueError('Received unexpected response from Transparent Classroom: {}'.format(
+                json_output
+            ))
+        student_classroom_session_data = list()
+        for datum in json_output:
+            for classroom_id in datum.get('classroom_ids', []):
+                student_classroom_datum = OrderedDict([
+                    ('school_id_tc', school_id),
+                    ('student_id_tc', datum.get('id')),
+                    ('pull_datetime', pull_datetime),
+                    ('session_id_tc', session_id),
+                    ('classroom_id_tc', classroom_id)
+                ])
+                student_classroom_session_data.append(student_classroom_datum)
+        return student_classroom_session_data
 
     def transparent_classroom_request(
         self,
