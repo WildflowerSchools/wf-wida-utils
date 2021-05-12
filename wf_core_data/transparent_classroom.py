@@ -44,6 +44,7 @@ class TransparentClassroomClient:
         self,
         base_directory,
         pull_datetime=None,
+        only_current=False,
         output_directory_stem='transparent_classroom_snapshot',
         all_data_list_filename_stem ='data_tc_list_dict',
         school_data_filename_stem='school_data_tc',
@@ -59,10 +60,14 @@ class TransparentClassroomClient:
         pull_datetime=wf_core_data.utils.to_datetime(pull_datetime)
         if pull_datetime is None:
             pull_datetime = datetime.datetime.now(tz=datetime.timezone.utc)
-        data = self.fetch_data(pull_datetime)
+        data = self.fetch_data(
+            pull_datetime=pull_datetime,
+            only_current=only_current
+        )
         write_data_local(
             data=data,
             base_directory=base_directory,
+            only_current=only_current,
             output_directory_stem=output_directory_stem,
             all_data_list_filename_stem=all_data_list_filename_stem,
             school_data_filename_stem=school_data_filename_stem,
@@ -78,7 +83,8 @@ class TransparentClassroomClient:
 
     def fetch_data(
         self,
-        pull_datetime=None
+        pull_datetime=None,
+        only_current=False
     ):
         pull_datetime=wf_core_data.utils.to_datetime(pull_datetime)
         if pull_datetime is None:
@@ -102,7 +108,8 @@ class TransparentClassroomClient:
         for school_id in school_ids:
             data_school= self.fetch_data_school(
                 school_id=school_id,
-                pull_datetime=pull_datetime
+                pull_datetime=pull_datetime,
+                only_current=only_current
             )
             data['classrooms'].extend(data_school['classrooms'])
             data['users'].extend(data_school['users'])
@@ -114,14 +121,24 @@ class TransparentClassroomClient:
             data['students_parents'].extend(data_school['students_parents'])
         return data
 
-    def fetch_data_school(self, school_id, pull_datetime=None):
+    def fetch_data_school(
+        self,
+        school_id,
+        pull_datetime=None,
+        only_current=False
+    ):
         school_id = int(school_id)
         pull_datetime = wf_core_data.utils.to_datetime(pull_datetime)
         if pull_datetime is None:
             pull_datetime = datetime.datetime.now(tz=datetime.timezone.utc)
-        logger.info('Fetching all data from Transparent Classroom for school ID {} for all sessions'.format(
-            school_id
-        ))
+        if only_current:
+            logger.info('Fetching only current data from Transparent Classroom for school ID {} for current session'.format(
+                school_id
+            ))
+        else:
+            logger.info('Fetching all data from Transparent Classroom for school ID {} for all sessions'.format(
+                school_id
+            ))
         session_data_school = self.fetch_session_data_school(
             school_id=school_id,
             pull_datetime=pull_datetime
@@ -136,7 +153,8 @@ class TransparentClassroomClient:
         )
         student_data_school, student_parent_data_school = self.fetch_student_data_school(
             school_id=school_id,
-            pull_datetime=pull_datetime
+            pull_datetime=pull_datetime,
+            only_current=only_current
         )
         teacher_default_classroom_data = list()
         teacher_accessible_classroom_data=list()
@@ -149,16 +167,21 @@ class TransparentClassroomClient:
                 )
                 teacher_default_classroom_data.extend(teacher_default_classroom_data_teacher)
                 teacher_accessible_classroom_data.extend(teacher_accessible_classroom_data_teacher)
-        session_ids = [session.get('session_id_tc') for session in session_data_school]
-        logger.info('Fetched {} session IDs'.format(len(session_ids)))
-        logger.info('Fetching student classroom association data from Transparent Classroom for school ID {} for each session'.format(
-            school_id
-        ))
+        if only_current:
+            logger.info('Fetching student classroom association data from Transparent Classroom for school ID {} for current session'.format(
+                school_id
+            ))
+        else:
+            logger.info('Fetching student classroom association data from Transparent Classroom for school ID {} for each session'.format(
+                school_id
+            ))
         student_classroom_data = list()
-        for session_id in session_ids:
+        for session in session_data_school:
+            if only_current and not session.get('session_current_tc'):
+                continue
             student_classroom_session_data = self.fetch_student_classroom_session_data(
                 school_id=school_id,
-                session_id=session_id,
+                session_id=session.get('session_id_tc'),
                 pull_datetime=pull_datetime
             )
             student_classroom_data.extend(student_classroom_session_data)
@@ -179,7 +202,10 @@ class TransparentClassroomClient:
         school_ids = [school.get('school_id_tc') for school in school_data]
         return school_ids
 
-    def fetch_school_data(self, pull_datetime=None):
+    def fetch_school_data(
+        self,
+        pull_datetime=None
+    ):
         pull_datetime = wf_core_data.utils.to_datetime(pull_datetime)
         if pull_datetime is None:
             pull_datetime = datetime.datetime.now(tz=datetime.timezone.utc)
@@ -203,7 +229,11 @@ class TransparentClassroomClient:
                 school_data.append(school_datum)
         return school_data
 
-    def fetch_classroom_data_school(self, school_id, pull_datetime=None):
+    def fetch_classroom_data_school(
+        self,
+        school_id,
+        pull_datetime=None
+    ):
         school_id = int(school_id)
         pull_datetime = wf_core_data.utils.to_datetime(pull_datetime)
         if pull_datetime is None:
@@ -234,7 +264,10 @@ class TransparentClassroomClient:
             classroom_data_school.append(classroom_datum)
         return classroom_data_school
 
-    def fetch_session_ids(self, school_id):
+    def fetch_session_ids(
+        self,
+        school_id
+    ):
         session_data_school = self.fetch_session_data_school(
             school_id=school_id,
             pull_datetime=None
@@ -242,7 +275,11 @@ class TransparentClassroomClient:
         session_ids = [session.get('session_id_tc') for session in session_data_school]
         return session_ids
 
-    def fetch_session_data_school(self, school_id, pull_datetime=None):
+    def fetch_session_data_school(
+        self,
+        school_id,
+        pull_datetime=None
+    ):
         school_id = int(school_id)
         pull_datetime = wf_core_data.utils.to_datetime(pull_datetime)
         if pull_datetime is None:
@@ -269,7 +306,11 @@ class TransparentClassroomClient:
             session_data_school.append(session_datum)
         return session_data_school
 
-    def fetch_user_data_school(self, school_id, pull_datetime=None):
+    def fetch_user_data_school(
+        self,
+        school_id,
+        pull_datetime=None
+    ):
         school_id = int(school_id)
         pull_datetime = wf_core_data.utils.to_datetime(pull_datetime)
         if pull_datetime is None:
@@ -299,7 +340,12 @@ class TransparentClassroomClient:
             user_data_school.append(user_datum)
         return user_data_school
 
-    def fetch_teacher_data(self, school_id, user_id, pull_datetime=None):
+    def fetch_teacher_data(
+        self,
+        school_id,
+        user_id,
+        pull_datetime=None
+    ):
         school_id = int(school_id)
         user_id = int(user_id)
         pull_datetime = wf_core_data.utils.to_datetime(pull_datetime)
@@ -337,7 +383,12 @@ class TransparentClassroomClient:
             teacher_accessible_classroom_data.append(teacher_accessible_classroom_datum)
         return teacher_default_classroom_data, teacher_accessible_classroom_data
 
-    def fetch_student_data_school(self, school_id, pull_datetime=None):
+    def fetch_student_data_school(
+        self,
+        school_id,
+        pull_datetime=None,
+        only_current=False
+    ):
         school_id = int(school_id)
         pull_datetime = wf_core_data.utils.to_datetime(pull_datetime)
         if pull_datetime is None:
@@ -345,11 +396,17 @@ class TransparentClassroomClient:
         logger.info('Fetching student data from Transparent Classroom for school ID {} for all sessions'.format(
             school_id
         ))
-        json_output = self.transparent_classroom_request(
-            'children.json',
+        if only_current:
+            params={
+                'only_current': 'true'
+            }
+        else:
             params={
                 'session_id': 'all'
-            },
+            }
+        json_output = self.transparent_classroom_request(
+            'children.json',
+            params=params,
             school_id=school_id
         )
         if not isinstance(json_output, list):
@@ -395,7 +452,12 @@ class TransparentClassroomClient:
                 student_parent_data_school.append(student_parent_datum)
         return student_data_school, student_parent_data_school
 
-    def fetch_student_classroom_session_data(self, school_id, session_id, pull_datetime=None):
+    def fetch_student_classroom_session_data(
+        self,
+        school_id,
+        session_id,
+        pull_datetime=None
+    ):
         school_id = int(school_id)
         session_id = int(session_id)
         pull_datetime = wf_core_data.utils.to_datetime(pull_datetime)
@@ -460,6 +522,7 @@ class TransparentClassroomClient:
 def write_data_local(
     data,
     base_directory,
+    only_current=False,
     output_directory_stem='transparent_classroom_snapshot',
     all_data_list_filename_stem ='data_tc_list_dict',
     school_data_filename_stem='school_data_tc',
@@ -472,6 +535,8 @@ def write_data_local(
     student_classroom_data_filename_stem='student_classroom_data_tc',
     student_parent_data_filename_stem='student_parent_data_tc'
 ):
+    if only_current:
+        output_directory_stem = output_directory_stem + '_current'
     # Create local directory
     pull_datetime = data['pull_datetime']
     timestamp_filename_suffix = pull_datetime.strftime('%Y%m%d_%H%M%S')
