@@ -45,6 +45,7 @@ class TransparentClassroomClient:
         base_directory,
         pull_datetime=None,
         only_current=False,
+        format='dataframe',
         output_directory_stem='transparent_classroom_snapshot',
         all_data_list_filename_stem ='data_tc_list_dict',
         school_data_filename_stem='school_data_tc',
@@ -62,12 +63,14 @@ class TransparentClassroomClient:
             pull_datetime = datetime.datetime.now(tz=datetime.timezone.utc)
         data = self.fetch_data(
             pull_datetime=pull_datetime,
-            only_current=only_current
+            only_current=only_current,
+            format=format
         )
         write_data_local(
             data=data,
             base_directory=base_directory,
             only_current=only_current,
+            format=format,
             output_directory_stem=output_directory_stem,
             all_data_list_filename_stem=all_data_list_filename_stem,
             school_data_filename_stem=school_data_filename_stem,
@@ -84,13 +87,17 @@ class TransparentClassroomClient:
     def fetch_data(
         self,
         pull_datetime=None,
-        only_current=False
+        only_current=False,
+        format='dataframe'
     ):
         pull_datetime=wf_core_data.utils.to_datetime(pull_datetime)
         if pull_datetime is None:
             pull_datetime = datetime.datetime.now(tz=datetime.timezone.utc)
         logger.info('Fetching all data from Transparent Classroom for all schools and sessions')
-        school_data = self.fetch_school_data(pull_datetime=pull_datetime)
+        school_data = self.fetch_school_data(
+            pull_datetime=pull_datetime,
+            format='list'
+        )
         school_ids = [school.get('school_id_tc') for school in school_data]
         logger.info('Fetched {} school IDs'.format(len(school_ids)))
         data = {
@@ -109,7 +116,8 @@ class TransparentClassroomClient:
             data_school= self.fetch_data_school(
                 school_id=school_id,
                 pull_datetime=pull_datetime,
-                only_current=only_current
+                only_current=only_current,
+                format='list'
             )
             data['classrooms'].extend(data_school['classrooms'])
             data['users'].extend(data_school['users'])
@@ -119,13 +127,28 @@ class TransparentClassroomClient:
             data['students'].extend(data_school['students'])
             data['students_classrooms'].extend(data_school['students_classrooms'])
             data['students_parents'].extend(data_school['students_parents'])
+        if format == 'dataframe':
+            data['schools'] = convert_school_data_to_df(data['schools'])
+            data['classrooms'] = convert_classroom_data_to_df(data['classrooms'])
+            data['users'] = convert_user_data_to_df(data['users'])
+            data['teachers_default_classrooms'] = convert_teacher_default_classroom_data_to_df(data['teachers_default_classrooms'])
+            data['teachers_accessible_classrooms'] = convert_teacher_accessible_classroom_data_to_df(data['teachers_accessible_classrooms'])
+            data['sessions'] = convert_session_data_to_df(data['sessions'])
+            data['students'] = convert_student_data_to_df(data['students'])
+            data['students_classrooms'] = convert_student_classroom_data_to_df(data['students_classrooms'])
+            data['students_parents'] = convert_student_parent_data_to_df(data['students_parents'])
+        elif format == 'list':
+            pass
+        else:
+            raise ValueError('Data format \'{}\' not recognized'.format(format))
         return data
 
     def fetch_data_school(
         self,
         school_id,
         pull_datetime=None,
-        only_current=False
+        only_current=False,
+        format='dataframe'
     ):
         school_id = int(school_id)
         pull_datetime = wf_core_data.utils.to_datetime(pull_datetime)
@@ -141,20 +164,24 @@ class TransparentClassroomClient:
             ))
         session_data_school = self.fetch_session_data_school(
             school_id=school_id,
-            pull_datetime=pull_datetime
+            pull_datetime=pull_datetime,
+            format='list'
         )
         classroom_data_school = self.fetch_classroom_data_school(
             school_id=school_id,
-            pull_datetime=pull_datetime
+            pull_datetime=pull_datetime,
+            format='list'
         )
         user_data_school = self.fetch_user_data_school(
             school_id=school_id,
-            pull_datetime=pull_datetime
+            pull_datetime=pull_datetime,
+            format='list'
         )
         student_data_school, student_parent_data_school = self.fetch_student_data_school(
             school_id=school_id,
             pull_datetime=pull_datetime,
-            only_current=only_current
+            only_current=only_current,
+            format='list'
         )
         teacher_default_classroom_data = list()
         teacher_accessible_classroom_data=list()
@@ -163,7 +190,8 @@ class TransparentClassroomClient:
                 teacher_default_classroom_data_teacher, teacher_accessible_classroom_data_teacher = self.fetch_teacher_data(
                     school_id=school_id,
                     user_id=user_datum['user_id_tc'],
-                    pull_datetime=pull_datetime
+                    pull_datetime=pull_datetime,
+                    format='list'
                 )
                 teacher_default_classroom_data.extend(teacher_default_classroom_data_teacher)
                 teacher_accessible_classroom_data.extend(teacher_accessible_classroom_data_teacher)
@@ -182,7 +210,8 @@ class TransparentClassroomClient:
             student_classroom_session_data = self.fetch_student_classroom_session_data(
                 school_id=school_id,
                 session_id=session.get('session_id_tc'),
-                pull_datetime=pull_datetime
+                pull_datetime=pull_datetime,
+                format='list'
             )
             student_classroom_data.extend(student_classroom_session_data)
         data_school = {
@@ -195,16 +224,33 @@ class TransparentClassroomClient:
             'students_classrooms': student_classroom_data,
             'students_parents': student_parent_data_school
         }
+        if format == 'dataframe':
+            data_school['classrooms'] = convert_classroom_data_to_df(data_school['classrooms'])
+            data_school['users'] = convert_user_data_to_df(data_school['users'])
+            data_school['teachers_default_classrooms'] = convert_teacher_default_classroom_data_to_df(data_school['teachers_default_classrooms'])
+            data_school['teachers_accessible_classrooms'] = convert_teacher_accessible_classroom_data_to_df(data_school['teachers_accessible_classrooms'])
+            data_school['sessions'] = convert_session_data_to_df(data_school['sessions'])
+            data_school['students'] = convert_student_data_to_df(data_school['students'])
+            data_school['students_classrooms'] = convert_student_classroom_data_to_df(data_school['students_classrooms'])
+            data_school['students_parents'] = convert_student_parent_data_to_df(data_school['students_parents'])
+        elif format == 'list':
+            pass
+        else:
+            raise ValueError('Data format \'{}\' not recognized'.format(format))
         return data_school
 
     def fetch_school_ids(self):
-        school_data = self.fetch_school_data()
+        school_data = self.fetch_school_data(
+            pull_datetime=None,
+            format='list'
+        )
         school_ids = [school.get('school_id_tc') for school in school_data]
         return school_ids
 
     def fetch_school_data(
         self,
-        pull_datetime=None
+        pull_datetime=None,
+        format='dataframe'
     ):
         pull_datetime = wf_core_data.utils.to_datetime(pull_datetime)
         if pull_datetime is None:
@@ -227,12 +273,19 @@ class TransparentClassroomClient:
                     ('school_time_zone_tc', datum.get('time_zone'))
                 ])
                 school_data.append(school_datum)
+        if format == 'dataframe':
+            school_data = convert_school_data_to_df(school_data)
+        elif format == 'list':
+            pass
+        else:
+            raise ValueError('Data format \'{}\' not recognized'.format(format))
         return school_data
 
     def fetch_classroom_data_school(
         self,
         school_id,
-        pull_datetime=None
+        pull_datetime=None,
+        format='dataframe'
     ):
         school_id = int(school_id)
         pull_datetime = wf_core_data.utils.to_datetime(pull_datetime)
@@ -262,6 +315,12 @@ class TransparentClassroomClient:
                 ('classroom_active_tc', wf_core_data.utils.to_boolean(datum.get('active')))
             ])
             classroom_data_school.append(classroom_datum)
+        if format == 'dataframe':
+            classroom_data_school = convert_classroom_data_to_df(classroom_data_school)
+        elif format == 'list':
+            pass
+        else:
+            raise ValueError('Data format \'{}\' not recognized'.format(format))
         return classroom_data_school
 
     def fetch_session_ids(
@@ -270,7 +329,8 @@ class TransparentClassroomClient:
     ):
         session_data_school = self.fetch_session_data_school(
             school_id=school_id,
-            pull_datetime=None
+            pull_datetime=None,
+            format='list'
         )
         session_ids = [session.get('session_id_tc') for session in session_data_school]
         return session_ids
@@ -278,7 +338,8 @@ class TransparentClassroomClient:
     def fetch_session_data_school(
         self,
         school_id,
-        pull_datetime=None
+        pull_datetime=None,
+        format='dataframe'
     ):
         school_id = int(school_id)
         pull_datetime = wf_core_data.utils.to_datetime(pull_datetime)
@@ -304,12 +365,19 @@ class TransparentClassroomClient:
                 ('session_num_children_tc', int(datum.get('children')))
             ])
             session_data_school.append(session_datum)
+        if format == 'dataframe':
+            session_data_school = convert_session_data_to_df(session_data_school)
+        elif format == 'list':
+            pass
+        else:
+            raise ValueError('Data format \'{}\' not recognized'.format(format))
         return session_data_school
 
     def fetch_user_data_school(
         self,
         school_id,
-        pull_datetime=None
+        pull_datetime=None,
+        format='dataframe'
     ):
         school_id = int(school_id)
         pull_datetime = wf_core_data.utils.to_datetime(pull_datetime)
@@ -338,13 +406,20 @@ class TransparentClassroomClient:
                 ('user_roles_tc', datum.get('roles'))
             ])
             user_data_school.append(user_datum)
+        if format == 'dataframe':
+            user_data_school = convert_user_data_to_df(user_data_school)
+        elif format == 'list':
+            pass
+        else:
+            raise ValueError('Data format \'{}\' not recognized'.format(format))
         return user_data_school
 
     def fetch_teacher_data(
         self,
         school_id,
         user_id,
-        pull_datetime=None
+        pull_datetime=None,
+        format='dataframe'
     ):
         school_id = int(school_id)
         user_id = int(user_id)
@@ -381,13 +456,21 @@ class TransparentClassroomClient:
                 ('teacher_accessible_classroom_id_tc', accessible_classroom_id)
             ])
             teacher_accessible_classroom_data.append(teacher_accessible_classroom_datum)
+        if format == 'dataframe':
+            teacher_default_classroom_data = convert_teacher_default_classroom_data_to_df(teacher_default_classroom_data)
+            teacher_accessible_classroom_data = convert_teacher_accessible_classroom_data_to_df(teacher_accessible_classroom_data)
+        elif format == 'list':
+            pass
+        else:
+            raise ValueError('Data format \'{}\' not recognized'.format(format))
         return teacher_default_classroom_data, teacher_accessible_classroom_data
 
     def fetch_student_data_school(
         self,
         school_id,
         pull_datetime=None,
-        only_current=False
+        only_current=False,
+        format='dataframe'
     ):
         school_id = int(school_id)
         pull_datetime = wf_core_data.utils.to_datetime(pull_datetime)
@@ -450,13 +533,21 @@ class TransparentClassroomClient:
                     ('parent_id_tc', parent_id)
                 ])
                 student_parent_data_school.append(student_parent_datum)
+        if format == 'dataframe':
+            student_data_school = convert_student_data_to_df(student_data_school)
+            student_parent_data_school = convert_student_parent_data_to_df(student_parent_data_school)
+        elif format == 'list':
+            pass
+        else:
+            raise ValueError('Data format \'{}\' not recognized'.format(format))
         return student_data_school, student_parent_data_school
 
     def fetch_student_classroom_session_data(
         self,
         school_id,
         session_id,
-        pull_datetime=None
+        pull_datetime=None,
+        format='dataframe'
     ):
         school_id = int(school_id)
         session_id = int(session_id)
@@ -489,6 +580,12 @@ class TransparentClassroomClient:
                     ('classroom_id_tc', classroom_id)
                 ])
                 student_classroom_session_data.append(student_classroom_datum)
+        if format == 'dataframe':
+            student_classroom_session_data = convert_student_classroom_data_to_df(student_classroom_session_data)
+        elif format == 'list':
+            pass
+        else:
+            raise ValueError('Data format \'{}\' not recognized'.format(format))
         return student_classroom_session_data
 
     def transparent_classroom_request(
@@ -523,6 +620,7 @@ def write_data_local(
     data,
     base_directory,
     only_current=False,
+    format='dataframe',
     output_directory_stem='transparent_classroom_snapshot',
     all_data_list_filename_stem ='data_tc_list_dict',
     school_data_filename_stem='school_data_tc',
@@ -551,209 +649,186 @@ def write_data_local(
         output_directory
     ))
     os.makedirs(output_directory, exist_ok=True)
-    # Write all data in list form to disk
-    with open(
-        os.path.join(
+    if format == 'list':
+        with open(
+            os.path.join(
+                output_directory,
+                '{}_{}.pkl'.format(
+                    all_data_list_filename_stem,
+                    timestamp_filename_suffix
+            ))
+            ,'wb'
+        ) as fp:
+            pickle.dump(data, fp)
+    elif format == 'dataframe':
+        # Write school data in dataframe form to disk
+        data['schools'].to_csv(
+            os.path.join(
+                output_directory,
+                '{}_{}.csv'.format(
+                    school_data_filename_stem,
+                    timestamp_filename_suffix
+                )
+            ),
+            index=False
+        )
+        data['schools'].to_pickle(os.path.join(
             output_directory,
             '{}_{}.pkl'.format(
-                all_data_list_filename_stem,
-                timestamp_filename_suffix
-        ))
-        ,'wb'
-    ) as fp:
-        pickle.dump(data, fp)
-    # Write school data in dataframe form to disk
-    schools_df = convert_school_data_to_df(
-        school_data=data['schools']
-    )
-    schools_df.to_csv(
-        os.path.join(
-            output_directory,
-            '{}_{}.csv'.format(
                 school_data_filename_stem,
                 timestamp_filename_suffix
             )
-        ),
-        index=False
-    )
-    schools_df.to_pickle(os.path.join(
-        output_directory,
-        '{}_{}.pkl'.format(
-            school_data_filename_stem,
-            timestamp_filename_suffix
+        ))
+        # Write classroom data in dataframe form to disk
+        data['classrooms'].to_csv(
+            os.path.join(
+                output_directory,
+                '{}_{}.csv'.format(
+                    classroom_data_filename_stem,
+                    timestamp_filename_suffix
+                )
+            ),
+            index=False
         )
-    ))
-    # Write classroom data in dataframe form to disk
-    classrooms_df = convert_classroom_data_to_df(
-        classroom_data=data['classrooms']
-    )
-    classrooms_df.to_csv(
-        os.path.join(
+        data['classrooms'].to_pickle(os.path.join(
             output_directory,
-            '{}_{}.csv'.format(
+            '{}_{}.pkl'.format(
                 classroom_data_filename_stem,
                 timestamp_filename_suffix
             )
-        ),
-        index=False
-    )
-    classrooms_df.to_pickle(os.path.join(
-        output_directory,
-        '{}_{}.pkl'.format(
-            classroom_data_filename_stem,
-            timestamp_filename_suffix
+        ))
+        # Write user data in dataframe form to disk
+        data['users'].to_csv(
+            os.path.join(
+                output_directory,
+                '{}_{}.csv'.format(
+                    user_data_filename_stem,
+                    timestamp_filename_suffix
+                )
+            ),
+            index=False
         )
-    ))
-    # Write user data in dataframe form to disk
-    users_df = convert_user_data_to_df(
-        user_data=data['users']
-    )
-
-    users_df.to_csv(
-        os.path.join(
+        data['users'].to_pickle(os.path.join(
             output_directory,
-            '{}_{}.csv'.format(
+            '{}_{}.pkl'.format(
                 user_data_filename_stem,
                 timestamp_filename_suffix
             )
-        ),
-        index=False
-    )
-    users_df.to_pickle(os.path.join(
-        output_directory,
-        '{}_{}.pkl'.format(
-            user_data_filename_stem,
-            timestamp_filename_suffix
+        ))
+        # Write teacher default classroom association data in dataframe form to disk
+        data['teachers_default_classrooms'].to_csv(
+            os.path.join(
+                output_directory,
+                '{}_{}.csv'.format(
+                    teacher_default_classroom_data_filename_stem,
+                    timestamp_filename_suffix
+                )
+            ),
+            index=False
         )
-    ))
-    # Write teacher default classroom association data in dataframe form to disk
-    teachers_default_classrooms_df = convert_teacher_default_classroom_data_to_df(
-        teacher_default_classroom_data=data['teachers_default_classrooms']
-    )
-    teachers_default_classrooms_df.to_csv(
-        os.path.join(
+        data['teachers_default_classrooms'].to_pickle(os.path.join(
             output_directory,
-            '{}_{}.csv'.format(
+            '{}_{}.pkl'.format(
                 teacher_default_classroom_data_filename_stem,
                 timestamp_filename_suffix
             )
-        ),
-        index=False
-    )
-    teachers_default_classrooms_df.to_pickle(os.path.join(
-        output_directory,
-        '{}_{}.pkl'.format(
-            teacher_default_classroom_data_filename_stem,
-            timestamp_filename_suffix
+        ))
+        # Write teacher accessible classroom association data in dataframe form to disk
+        data['teachers_accessible_classrooms'].to_csv(
+            os.path.join(
+                output_directory,
+                '{}_{}.csv'.format(
+                    teacher_accessible_classroom_data_filename_stem,
+                    timestamp_filename_suffix
+                )
+            ),
+            index=False
         )
-    ))
-    # Write teacher accessible classroom association data in dataframe form to disk
-    teachers_accessible_classrooms_df = convert_teacher_accessible_classroom_data_to_df(
-        teacher_accessible_classroom_data=data['teachers_accessible_classrooms']
-    )
-    teachers_accessible_classrooms_df.to_csv(
-        os.path.join(
+        data['teachers_accessible_classrooms'].to_pickle(os.path.join(
             output_directory,
-            '{}_{}.csv'.format(
+            '{}_{}.pkl'.format(
                 teacher_accessible_classroom_data_filename_stem,
                 timestamp_filename_suffix
             )
-        ),
-        index=False
-    )
-    teachers_accessible_classrooms_df.to_pickle(os.path.join(
-        output_directory,
-        '{}_{}.pkl'.format(
-            teacher_accessible_classroom_data_filename_stem,
-            timestamp_filename_suffix
+        ))
+        # Write session data in dataframe form to disk
+        data['sessions'].to_csv(
+            os.path.join(
+                output_directory,
+                '{}_{}.csv'.format(
+                    session_data_filename_stem,
+                    timestamp_filename_suffix
+                )
+            ),
+            index=False
         )
-    ))
-    # Write session data in dataframe form to disk
-    sessions_df = convert_session_data_to_df(
-        session_data=data['sessions']
-    )
-    sessions_df.to_csv(
-        os.path.join(
+        data['sessions'].to_pickle(os.path.join(
             output_directory,
-            '{}_{}.csv'.format(
+            '{}_{}.pkl'.format(
                 session_data_filename_stem,
                 timestamp_filename_suffix
             )
-        ),
-        index=False
-    )
-    sessions_df.to_pickle(os.path.join(
-        output_directory,
-        '{}_{}.pkl'.format(
-            session_data_filename_stem,
-            timestamp_filename_suffix
+        ))
+        # Write student data in dataframe form to disk
+        data['students'].to_csv(
+            os.path.join(
+                output_directory,
+                '{}_{}.csv'.format(
+                    student_data_filename_stem,
+                    timestamp_filename_suffix
+                )
+            ),
+            index=False
         )
-    ))
-    # Write student data in dataframe form to disk
-    students_df = wf_core_data.convert_student_data_to_df(
-        student_data=data['students']
-    )
-    students_df.to_csv(
-        os.path.join(
+        data['students'].to_pickle(os.path.join(
             output_directory,
-            '{}_{}.csv'.format(
+            '{}_{}.pkl'.format(
                 student_data_filename_stem,
                 timestamp_filename_suffix
             )
-        ),
-        index=False
-    )
-    students_df.to_pickle(os.path.join(
-        output_directory,
-        '{}_{}.pkl'.format(
-            student_data_filename_stem,
-            timestamp_filename_suffix
+        ))
+        # Write student classroom association data in dataframe form to disk
+        data['students_classrooms'].to_csv(
+            os.path.join(
+                output_directory,
+                '{}_{}.csv'.format(
+                    student_classroom_data_filename_stem,
+                    timestamp_filename_suffix
+                )
+            ),
+            index=False
         )
-    ))
-    # Write student classroom association data in dataframe form to disk
-    students_classrooms_df = convert_student_classroom_data_to_df(
-        student_classroom_data=data['students_classrooms']
-    )
-    students_classrooms_df.to_csv(
-        os.path.join(
+        data['students_classrooms'].to_pickle(os.path.join(
             output_directory,
-            '{}_{}.csv'.format(
+            '{}_{}.pkl'.format(
                 student_classroom_data_filename_stem,
                 timestamp_filename_suffix
             )
-        ),
-        index=False
-    )
-    students_classrooms_df.to_pickle(os.path.join(
-        output_directory,
-        '{}_{}.pkl'.format(
-            student_classroom_data_filename_stem,
-            timestamp_filename_suffix
+        ))
+        # Write student parent association data in dataframe form to disk
+        data['students_parents'].to_csv(
+            os.path.join(
+                output_directory,
+                '{}_{}.csv'.format(
+                    student_parent_data_filename_stem,
+                    timestamp_filename_suffix
+                )
+            ),
+            index=False
         )
-    ))
-    # Write student parent association data in dataframe form to disk
-    students_parents_df = convert_student_parent_data_to_df(
-        student_parent_data=data['students_parents']
-    )
-    students_parents_df.to_csv(
-        os.path.join(
+        data['students_parents'].to_pickle(os.path.join(
             output_directory,
-            '{}_{}.csv'.format(
+            '{}_{}.pkl'.format(
                 student_parent_data_filename_stem,
                 timestamp_filename_suffix
             )
-        ),
-        index=False
-    )
-    students_parents_df.to_pickle(os.path.join(
-        output_directory,
-        '{}_{}.pkl'.format(
-            student_parent_data_filename_stem,
-            timestamp_filename_suffix
-        )
-    ))
+        ))
+    else:
+        raise ValueError('Data format \'{}\' not recognized'.format(format))
 
 def convert_school_data_to_df(school_data):
+    if len(school_data) == 0:
+        return pd.DataFrame()
     school_data_df = pd.DataFrame(
         school_data,
         dtype='object'
@@ -769,6 +844,8 @@ def convert_school_data_to_df(school_data):
     return school_data_df
 
 def convert_classroom_data_to_df(classroom_data):
+    if len(classroom_data) == 0:
+        return pd.DataFrame()
     classroom_data_df = pd.DataFrame(
         classroom_data,
         dtype='object'
@@ -785,6 +862,8 @@ def convert_classroom_data_to_df(classroom_data):
     return classroom_data_df
 
 def convert_user_data_to_df(user_data):
+    if len(user_data) == 0:
+        return pd.DataFrame()
     user_data_df = pd.DataFrame(
         user_data,
         dtype='object'
@@ -800,6 +879,8 @@ def convert_user_data_to_df(user_data):
     return user_data_df
 
 def convert_teacher_default_classroom_data_to_df(teacher_default_classroom_data):
+    if len(teacher_default_classroom_data) == 0:
+        return pd.DataFrame()
     teacher_default_classroom_data_df = pd.DataFrame(
         teacher_default_classroom_data,
         dtype='object'
@@ -813,6 +894,8 @@ def convert_teacher_default_classroom_data_to_df(teacher_default_classroom_data)
     return teacher_default_classroom_data_df
 
 def convert_teacher_accessible_classroom_data_to_df(teacher_accessible_classroom_data):
+    if len(teacher_accessible_classroom_data) == 0:
+        return pd.DataFrame()
     teacher_accessible_classroom_data_df = pd.DataFrame(
         teacher_accessible_classroom_data,
         dtype='object'
@@ -826,6 +909,8 @@ def convert_teacher_accessible_classroom_data_to_df(teacher_accessible_classroom
     return teacher_accessible_classroom_data_df
 
 def convert_session_data_to_df(session_data):
+    if len(session_data) == 0:
+        return pd.DataFrame()
     session_data_df = pd.DataFrame(
         session_data,
         dtype='object'
@@ -842,6 +927,8 @@ def convert_session_data_to_df(session_data):
     return session_data_df
 
 def convert_student_data_to_df(student_data):
+    if len(student_data) == 0:
+        return pd.DataFrame()
     student_data_df = pd.DataFrame(
         student_data,
         dtype='object'
@@ -874,6 +961,8 @@ def convert_student_data_to_df(student_data):
     return student_data_df
 
 def convert_student_classroom_data_to_df(student_classroom_data):
+    if len(student_classroom_data) == 0:
+        return pd.DataFrame()
     student_classroom_data_df = pd.DataFrame(
         student_classroom_data,
         dtype='object'
@@ -888,6 +977,8 @@ def convert_student_classroom_data_to_df(student_classroom_data):
     return student_classroom_data_df
 
 def convert_student_parent_data_to_df(student_parent_data):
+    if len(student_parent_data) == 0:
+        return pd.DataFrame()
     student_parent_data_df = pd.DataFrame(
         student_parent_data,
         dtype='object'
