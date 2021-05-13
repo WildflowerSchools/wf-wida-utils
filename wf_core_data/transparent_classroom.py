@@ -610,9 +610,12 @@ class TransparentClassroomClient:
             auth=auth
         )
         if r.status_code != 200:
-            error_message = 'Transparent Classroom request returned error'
-            if r.json().get('errors') is not None:
-                error_message += '\n{}'.format(json.dumps(r.json().get('errors'), indent=2))
+            error_message = 'Transparent Classroom request returned status code {}'.format(r.status_code)
+            try:
+                if r.json().get('errors') is not None:
+                    error_message += '\n{}'.format(json.dumps(r.json().get('errors'), indent=2))
+            except:
+                pass
             raise Exception(error_message)
         return r.json()
 
@@ -841,6 +844,7 @@ def convert_school_data_to_df(school_data):
         'school_phone_tc': 'string',
         'school_time_zone_tc': 'string'
     })
+    school_data_df.set_index('school_id_tc', inplace=True)
     return school_data_df
 
 def convert_classroom_data_to_df(classroom_data):
@@ -859,6 +863,7 @@ def convert_classroom_data_to_df(classroom_data):
         'classroom_level_tc': 'string',
         'classroom_active_tc': 'bool'
     })
+    classroom_data_df.set_index(['school_id_tc', 'classroom_id_tc'], inplace=True)
     return classroom_data_df
 
 def convert_user_data_to_df(user_data):
@@ -876,6 +881,7 @@ def convert_user_data_to_df(user_data):
         'user_last_name_tc': 'string',
         'user_email_tc': 'string',
     })
+    user_data_df.set_index(['school_id_tc', 'user_id_tc'], inplace=True)
     return user_data_df
 
 def convert_teacher_default_classroom_data_to_df(teacher_default_classroom_data):
@@ -891,6 +897,7 @@ def convert_teacher_default_classroom_data_to_df(teacher_default_classroom_data)
         'user_id_tc': 'int',
         'teacher_default_classroom_id_tc': 'int'
     })
+    teacher_default_classroom_data_df.set_index(['school_id_tc', 'user_id_tc'], inplace=True)
     return teacher_default_classroom_data_df
 
 def convert_teacher_accessible_classroom_data_to_df(teacher_accessible_classroom_data):
@@ -906,6 +913,7 @@ def convert_teacher_accessible_classroom_data_to_df(teacher_accessible_classroom
         'user_id_tc': 'int',
         'teacher_accessible_classroom_id_tc': 'int'
     })
+    teacher_accessible_classroom_data_df.set_index(['school_id_tc', 'user_id_tc', 'teacher_accessible_classroom_id_tc'], inplace=True)
     return teacher_accessible_classroom_data_df
 
 def convert_session_data_to_df(session_data):
@@ -924,6 +932,7 @@ def convert_session_data_to_df(session_data):
         'session_inactive_tc': 'bool',
         'session_num_children_tc': 'Int64'
     })
+    session_data_df.set_index(['school_id_tc', 'session_id_tc'], inplace=True)
     return session_data_df
 
 def convert_student_data_to_df(student_data):
@@ -958,6 +967,7 @@ def convert_student_data_to_df(student_data):
             'student_exit_survey_id_tc': 'Int64',
             'student_exit_notes_tc': 'string'
     })
+    student_data_df.set_index(['school_id_tc', 'student_id_tc'], inplace=True)
     return student_data_df
 
 def convert_student_classroom_data_to_df(student_classroom_data):
@@ -974,6 +984,7 @@ def convert_student_classroom_data_to_df(student_classroom_data):
             'session_id_tc': 'int',
             'classroom_id_tc': 'int'
     })
+    student_classroom_data_df.set_index(['school_id_tc', 'student_id_tc', 'session_id_tc', 'classroom_id_tc'], inplace=True)
     return student_classroom_data_df
 
 def convert_student_parent_data_to_df(student_parent_data):
@@ -989,4 +1000,5 @@ def convert_student_parent_data_to_df(student_parent_data):
             'student_id_tc': 'int',
             'parent_id_tc': 'int'
     })
+    student_parent_data_df.set_index(['school_id_tc', 'student_id_tc', 'parent_id_tc'], inplace=True)
     return student_parent_data_df
