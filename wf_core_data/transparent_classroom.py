@@ -187,7 +187,7 @@ class TransparentClassroomClient:
         teacher_accessible_classroom_data=list()
         for user_datum in user_data_school:
             if 'teacher' in user_datum.get('user_roles_tc', []):
-                teacher_default_classroom_data_teacher, teacher_accessible_classroom_data_teacher = self.fetch_teacher_data(
+                teacher_default_classroom_data_teacher, teacher_accessible_classroom_data_teacher = self.fetch_teacher_classroom_data_teacher(
                     school_id=school_id,
                     user_id=user_datum['user_id_tc'],
                     pull_datetime=pull_datetime,
@@ -207,13 +207,13 @@ class TransparentClassroomClient:
         for session in session_data_school:
             if only_current and not session.get('session_current_tc'):
                 continue
-            student_classroom_session_data = self.fetch_student_classroom_session_data(
+            student_classroom_data_session = self.fetch_student_classroom_data_session(
                 school_id=school_id,
                 session_id=session.get('session_id_tc'),
                 pull_datetime=pull_datetime,
                 format='list'
             )
-            student_classroom_data.extend(student_classroom_session_data)
+            student_classroom_data.extend(student_classroom_data_session)
         data_school = {
             'classrooms': classroom_data_school,
             'users': user_data_school,
@@ -239,231 +239,38 @@ class TransparentClassroomClient:
             raise ValueError('Data format \'{}\' not recognized'.format(format))
         return data_school
 
-    def fetch_school_ids(self):
-        school_data = self.fetch_school_data(
-            pull_datetime=None,
-            format='list'
-        )
-        school_ids = [school.get('school_id_tc') for school in school_data]
-        return school_ids
-
-    def fetch_school_data(
+    def fetch_student_data(
         self,
+        school_ids=None,
         pull_datetime=None,
+        only_current=False,
         format='dataframe'
     ):
         pull_datetime = wf_core_data.utils.to_datetime(pull_datetime)
         if pull_datetime is None:
             pull_datetime = datetime.datetime.now(tz=datetime.timezone.utc)
-        logger.info('Fetching school data from Transparent Classroom for all schools')
-        json_output = self.transparent_classroom_request('schools.json')
-        if not isinstance(json_output, list):
-            raise ValueError('Received unexpected response from Transparent Classroom: {}'.format(
-                json_output
-            ))
-        school_data=list()
-        for datum in json_output:
-            if datum.get('type') == 'School':
-                school_datum = OrderedDict([
-                    ('school_id_tc', datum.get('id')),
-                    ('pull_datetime', pull_datetime),
-                    ('school_name_tc', datum.get('name')),
-                    ('school_address_tc', datum.get('address')),
-                    ('school_phone_tc', datum.get('phone')),
-                    ('school_time_zone_tc', datum.get('time_zone'))
-                ])
-                school_data.append(school_datum)
+        if school_ids is None:
+            school_ids=self.fetch_school_ids()
+        logger.info('Fetching student data from Transparent Classroom for {} schools'.format(len(school_ids)))
+        student_data = list()
+        student_parent_data = list()
+        for school_id in school_ids:
+            student_data_school, student_parent_data_school = self.fetch_student_data_school(
+                school_id=school_id,
+                pull_datetime=pull_datetime,
+                only_current=only_current,
+                format='list'
+            )
+            student_data.extend(student_data_school)
+            student_parent_data.extend(student_parent_data_school)
         if format == 'dataframe':
-            school_data = convert_school_data_to_df(school_data)
+            student_data = convert_student_data_to_df(student_data)
+            student_parent_data = convert_student_parent_data_to_df(student_parent_data)
         elif format == 'list':
             pass
         else:
             raise ValueError('Data format \'{}\' not recognized'.format(format))
-        return school_data
-
-    def fetch_classroom_data_school(
-        self,
-        school_id,
-        pull_datetime=None,
-        format='dataframe'
-    ):
-        school_id = int(school_id)
-        pull_datetime = wf_core_data.utils.to_datetime(pull_datetime)
-        if pull_datetime is None:
-            pull_datetime = datetime.datetime.now(tz=datetime.timezone.utc)
-        logger.info('Fetching classroom data from Transparent Classroom for school ID {}'.format(school_id))
-        json_output = self.transparent_classroom_request(
-            'classrooms.json',
-                params={
-                    'show_inactive': True
-                },
-            school_id=school_id
-        )
-        if not isinstance(json_output, list):
-            raise ValueError('Received unexpected response from Transparent Classroom: {}'.format(
-                json_output
-            ))
-        classroom_data_school=list()
-        for datum in json_output:
-            classroom_datum = OrderedDict([
-                ('school_id_tc', school_id),
-                ('classroom_id_tc', datum.get('id')),
-                ('pull_datetime', pull_datetime),
-                ('classroom_name_tc', datum.get('name')),
-                ('classroom_lesson_set_id_tc', datum.get('lesson_set_id')),
-                ('classroom_level_tc', datum.get('level')),
-                ('classroom_active_tc', wf_core_data.utils.to_boolean(datum.get('active')))
-            ])
-            classroom_data_school.append(classroom_datum)
-        if format == 'dataframe':
-            classroom_data_school = convert_classroom_data_to_df(classroom_data_school)
-        elif format == 'list':
-            pass
-        else:
-            raise ValueError('Data format \'{}\' not recognized'.format(format))
-        return classroom_data_school
-
-    def fetch_session_ids(
-        self,
-        school_id
-    ):
-        session_data_school = self.fetch_session_data_school(
-            school_id=school_id,
-            pull_datetime=None,
-            format='list'
-        )
-        session_ids = [session.get('session_id_tc') for session in session_data_school]
-        return session_ids
-
-    def fetch_session_data_school(
-        self,
-        school_id,
-        pull_datetime=None,
-        format='dataframe'
-    ):
-        school_id = int(school_id)
-        pull_datetime = wf_core_data.utils.to_datetime(pull_datetime)
-        if pull_datetime is None:
-            pull_datetime = datetime.datetime.now(tz=datetime.timezone.utc)
-        logger.info('Fetching session data from Transparent Classroom for school ID {}'.format(school_id))
-        json_output = self.transparent_classroom_request('sessions.json', school_id=school_id)
-        if not isinstance(json_output, list):
-            raise ValueError('Received unexpected response from Transparent Classroom: {}'.format(
-                json_output
-            ))
-        session_data_school=list()
-        for datum in json_output:
-            session_datum = OrderedDict([
-                ('school_id_tc', school_id),
-                ('session_id_tc', datum.get('id')),
-                ('pull_datetime', pull_datetime),
-                ('session_name_tc', datum.get('name')),
-                ('session_start_date_tc', wf_core_data.utils.to_date(datum.get('start_date'))),
-                ('session_stop_date_tc', wf_core_data.utils.to_date(datum.get('stop_date'))),
-                ('session_current_tc', wf_core_data.utils.to_boolean(datum.get('current'))),
-                ('session_inactive_tc', wf_core_data.utils.to_boolean(datum.get('inactive'))),
-                ('session_num_children_tc', int(datum.get('children')))
-            ])
-            session_data_school.append(session_datum)
-        if format == 'dataframe':
-            session_data_school = convert_session_data_to_df(session_data_school)
-        elif format == 'list':
-            pass
-        else:
-            raise ValueError('Data format \'{}\' not recognized'.format(format))
-        return session_data_school
-
-    def fetch_user_data_school(
-        self,
-        school_id,
-        pull_datetime=None,
-        format='dataframe'
-    ):
-        school_id = int(school_id)
-        pull_datetime = wf_core_data.utils.to_datetime(pull_datetime)
-        if pull_datetime is None:
-            pull_datetime = datetime.datetime.now(tz=datetime.timezone.utc)
-        logger.info('Fetching user data from Transparent Classroom for school ID {}'.format(
-            school_id
-        ))
-        json_output = self.transparent_classroom_request(
-            'users.json',
-            school_id=school_id
-        )
-        if not isinstance(json_output, list):
-            raise ValueError('Received unexpected response from Transparent Classroom: {}'.format(
-                json_output
-            ))
-        user_data_school = list()
-        for datum in json_output:
-            user_datum = OrderedDict([
-                ('school_id_tc', school_id),
-                ('user_id_tc', datum.get('id')),
-                ('pull_datetime', pull_datetime),
-                ('user_first_name_tc', datum.get('first_name')),
-                ('user_last_name_tc', datum.get('last_name')),
-                ('user_email_tc', datum.get('email')),
-                ('user_roles_tc', datum.get('roles'))
-            ])
-            user_data_school.append(user_datum)
-        if format == 'dataframe':
-            user_data_school = convert_user_data_to_df(user_data_school)
-        elif format == 'list':
-            pass
-        else:
-            raise ValueError('Data format \'{}\' not recognized'.format(format))
-        return user_data_school
-
-    def fetch_teacher_data(
-        self,
-        school_id,
-        user_id,
-        pull_datetime=None,
-        format='dataframe'
-    ):
-        school_id = int(school_id)
-        user_id = int(user_id)
-        pull_datetime = wf_core_data.utils.to_datetime(pull_datetime)
-        if pull_datetime is None:
-            pull_datetime = datetime.datetime.now(tz=datetime.timezone.utc)
-        logger.info('Fetching teacher data from Transparent Classroom for school ID {} and user id {}'.format(
-            school_id,
-            user_id
-        ))
-        teacher_datum = self.transparent_classroom_request(
-            'users/{}.json'.format(user_id),
-            school_id=school_id
-        )
-        if not isinstance(teacher_datum, dict):
-            raise ValueError('Received unexpected response from Transparent Classroom: {}'.format(
-                teacher_datum
-            ))
-        teacher_default_classroom_data = list()
-        teacher_accessible_classroom_data = list()
-        if teacher_datum.get('default_classroom_id') is not None:
-            teacher_default_classroom_datum = OrderedDict([
-                ('school_id_tc', school_id),
-                ('user_id_tc', teacher_datum.get('id')),
-                ('pull_datetime', pull_datetime),
-                ('teacher_default_classroom_id_tc', teacher_datum.get('default_classroom_id'))
-            ])
-            teacher_default_classroom_data.append(teacher_default_classroom_datum)
-        for accessible_classroom_id in teacher_datum.get('accessible_classroom_ids', []):
-            teacher_accessible_classroom_datum = OrderedDict([
-                ('school_id_tc', school_id),
-                ('user_id_tc', teacher_datum.get('id')),
-                ('pull_datetime', pull_datetime),
-                ('teacher_accessible_classroom_id_tc', accessible_classroom_id)
-            ])
-            teacher_accessible_classroom_data.append(teacher_accessible_classroom_datum)
-        if format == 'dataframe':
-            teacher_default_classroom_data = convert_teacher_default_classroom_data_to_df(teacher_default_classroom_data)
-            teacher_accessible_classroom_data = convert_teacher_accessible_classroom_data_to_df(teacher_accessible_classroom_data)
-        elif format == 'list':
-            pass
-        else:
-            raise ValueError('Data format \'{}\' not recognized'.format(format))
-        return teacher_default_classroom_data, teacher_accessible_classroom_data
+        return student_data, student_parent_data
 
     def fetch_student_data_school(
         self,
@@ -542,7 +349,103 @@ class TransparentClassroomClient:
             raise ValueError('Data format \'{}\' not recognized'.format(format))
         return student_data_school, student_parent_data_school
 
-    def fetch_student_classroom_session_data(
+    def fetch_student_classroom_data(
+        self,
+        school_ids=None,
+        session_data=None,
+        pull_datetime=None,
+        only_current=False,
+        format='dataframe'
+    ):
+        pull_datetime = wf_core_data.utils.to_datetime(pull_datetime)
+        if pull_datetime is None:
+            pull_datetime = datetime.datetime.now(tz=datetime.timezone.utc)
+        if school_ids is not None and session_data is not None:
+            raise ValueError('Cannot specify both session data and school IDs')
+        student_classroom_data = list()
+        if session_data is not None:
+            if not isinstance(session_data, pd.DataFrame):
+                session_data = convert_session_data_to_df(session_data)
+            logger.info('Fetching student classroom association data from Transparent Classroom for {} schools'.format(
+                len(session_data.index.get_level_values('school_id_tc').unique())
+            ))
+            for school_id, group_df in session_data.groupby('school_id_tc'):
+                # print(group_df)
+                session_data_list = group_df.reset_index().to_dict(orient='records')
+                # print(session_data_list)
+                student_classroom_data_school = self.fetch_student_classroom_data_school(
+                    school_id=school_id,
+                    session_data_list=session_data_list,
+                    pull_datetime=pull_datetime,
+                    only_current=only_current,
+                    format='list'
+                )
+                student_classroom_data.extend(student_classroom_data_school)
+        else:
+            if school_ids is None:
+                school_ids=self.fetch_school_ids()
+            logger.info('Fetching student classroom association data from Transparent Classroom for {} schools'.format(
+                len(school_ids)
+            ))
+            for school_id in school_ids:
+                student_classroom_data_school = self.fetch_student_classroom_data_school(
+                    school_id=school_id,
+                    session_data_list=None,
+                    pull_datetime=pull_datetime,
+                    only_current=only_current,
+                    format='list'
+                )
+                student_classroom_data.extend(student_classroom_data_school)
+        if format == 'dataframe':
+            student_classroom_data = convert_student_classroom_data_to_df(student_classroom_data)
+        elif format == 'list':
+            pass
+        else:
+            raise ValueError('Data format \'{}\' not recognized'.format(format))
+        return student_classroom_data
+
+    def fetch_student_classroom_data_school(
+        self,
+        school_id,
+        session_data_list=None,
+        pull_datetime=None,
+        only_current=False,
+        format='dataframe'
+    ):
+        if school_id is not None:
+            school_id = int(school_id)
+        pull_datetime = wf_core_data.utils.to_datetime(pull_datetime)
+        if pull_datetime is None:
+            pull_datetime = datetime.datetime.now(tz=datetime.timezone.utc)
+        if session_data_list is None:
+            session_data_list = self.fetch_session_data_school(
+                school_id=school_id,
+                pull_datetime=pull_datetime,
+                format='list'
+            )
+        logger.info('Fetching student classroom association data from Transparent Classroom for school ID {}'.format(
+            school_id,
+        ))
+        student_classroom_data_school = list()
+        for session in session_data_list:
+            if only_current and not session.get('session_current_tc'):
+                continue
+            student_classroom_data_session = self.fetch_student_classroom_data_session(
+                school_id=school_id,
+                session_id=session.get('session_id_tc'),
+                pull_datetime=pull_datetime,
+                format='list'
+            )
+            student_classroom_data_school.extend(student_classroom_data_session)
+        if format == 'dataframe':
+            student_classroom_data_school = convert_student_classroom_data_to_df(student_classroom_data_school)
+        elif format == 'list':
+            pass
+        else:
+            raise ValueError('Data format \'{}\' not recognized'.format(format))
+        return student_classroom_data_school
+
+    def fetch_student_classroom_data_session(
         self,
         school_id,
         session_id,
@@ -569,7 +472,7 @@ class TransparentClassroomClient:
             raise ValueError('Received unexpected response from Transparent Classroom: {}'.format(
                 json_output
             ))
-        student_classroom_session_data = list()
+        student_classroom_data_session = list()
         for datum in json_output:
             for classroom_id in datum.get('classroom_ids', []):
                 student_classroom_datum = OrderedDict([
@@ -579,14 +482,535 @@ class TransparentClassroomClient:
                     ('session_id_tc', session_id),
                     ('classroom_id_tc', classroom_id)
                 ])
-                student_classroom_session_data.append(student_classroom_datum)
+                student_classroom_data_session.append(student_classroom_datum)
         if format == 'dataframe':
-            student_classroom_session_data = convert_student_classroom_data_to_df(student_classroom_session_data)
+            student_classroom_data_session = convert_student_classroom_data_to_df(student_classroom_data_session)
         elif format == 'list':
             pass
         else:
             raise ValueError('Data format \'{}\' not recognized'.format(format))
-        return student_classroom_session_data
+        return student_classroom_data_session
+
+    def fetch_session_ids_school(
+        self,
+        school_id
+    ):
+        session_data_school = self.fetch_session_data_school(
+            school_id=school_id,
+            pull_datetime=None,
+            format='list'
+        )
+        session_ids_school = [session.get('session_id_tc') for session in session_data_school]
+        return session_ids_school
+
+    def fetch_session_data(
+        self,
+        school_ids=None,
+        pull_datetime=None,
+        format='dataframe'
+    ):
+        pull_datetime = wf_core_data.utils.to_datetime(pull_datetime)
+        if pull_datetime is None:
+            pull_datetime = datetime.datetime.now(tz=datetime.timezone.utc)
+        if school_ids is None:
+            school_ids=self.fetch_school_ids()
+        logger.info('Fetching session data from Transparent Classroom for {} schools'.format(len(school_ids)))
+        session_data = list()
+        for school_id in school_ids:
+            session_data_school = self.fetch_session_data_school(
+                school_id=school_id,
+                pull_datetime=pull_datetime,
+                format='list'
+            )
+            session_data.extend(session_data_school)
+        if format == 'dataframe':
+            session_data = convert_session_data_to_df(session_data)
+        elif format == 'list':
+            pass
+        else:
+            raise ValueError('Data format \'{}\' not recognized'.format(format))
+        return session_data
+
+    def fetch_session_data_school(
+        self,
+        school_id,
+        pull_datetime=None,
+        format='dataframe'
+    ):
+        school_id = int(school_id)
+        pull_datetime = wf_core_data.utils.to_datetime(pull_datetime)
+        if pull_datetime is None:
+            pull_datetime = datetime.datetime.now(tz=datetime.timezone.utc)
+        logger.info('Fetching session data from Transparent Classroom for school ID {}'.format(school_id))
+        json_output = self.transparent_classroom_request('sessions.json', school_id=school_id)
+        if not isinstance(json_output, list):
+            raise ValueError('Received unexpected response from Transparent Classroom: {}'.format(
+                json_output
+            ))
+        session_data_school=list()
+        for datum in json_output:
+            session_datum = OrderedDict([
+                ('school_id_tc', school_id),
+                ('session_id_tc', datum.get('id')),
+                ('pull_datetime', pull_datetime),
+                ('session_name_tc', datum.get('name')),
+                ('session_start_date_tc', wf_core_data.utils.to_date(datum.get('start_date'))),
+                ('session_stop_date_tc', wf_core_data.utils.to_date(datum.get('stop_date'))),
+                ('session_current_tc', wf_core_data.utils.to_boolean(datum.get('current'))),
+                ('session_inactive_tc', wf_core_data.utils.to_boolean(datum.get('inactive'))),
+                ('session_num_children_tc', int(datum.get('children')))
+            ])
+            session_data_school.append(session_datum)
+        if format == 'dataframe':
+            session_data_school = convert_session_data_to_df(session_data_school)
+        elif format == 'list':
+            pass
+        else:
+            raise ValueError('Data format \'{}\' not recognized'.format(format))
+        return session_data_school
+
+    def fetch_teacher_classroom_data(
+        self,
+        school_ids=None,
+        user_data=None,
+        pull_datetime=None,
+        format='dataframe'
+    ):
+        pull_datetime = wf_core_data.utils.to_datetime(pull_datetime)
+        if pull_datetime is None:
+            pull_datetime = datetime.datetime.now(tz=datetime.timezone.utc)
+        if school_ids is not None and user_data is not None:
+            raise ValueError('Cannot specify both school IDs and user data')
+        teacher_default_classroom_data = list()
+        teacher_accessible_classroom_data = list()
+        if user_data is not None:
+            if not isinstance(user_data, pd.DataFrame):
+                user_data = convert_user_data_to_df(user_data)
+            teacher_data = user_data.loc[user_data['user_roles_tc'].apply(lambda x: 'teacher' in x)]
+            logger.info('Fetching teacher classroom association data from Transparent Classroom for {} schools'.format(
+                len(teacher_data.index.get_level_values('school_id_tc').unique())
+            ))
+            for school_id, group_df in teacher_data.groupby('school_id_tc'):
+                user_ids = group_df.index.get_level_values('user_id_tc').unique().tolist()
+                teacher_default_classroom_data_school, teacher_accessible_classroom_data_school = self.fetch_teacher_classroom_data_school(
+                    school_id=school_id,
+                    user_ids=user_ids,
+                    pull_datetime=pull_datetime,
+                    format='list'
+                )
+                teacher_default_classroom_data.extend(teacher_default_classroom_data_school)
+                teacher_accessible_classroom_data.extend(teacher_accessible_classroom_data_school)
+        else:
+            if school_ids is None:
+                school_ids = self.fetch_school_ids()
+            logger.info('Fetching teacher classroom association data from Transparent Classroom for {} schools'.format(
+                len(school_ids)
+            ))
+            for school_id in school_ids:
+                teacher_default_classroom_data_school, teacher_accessible_classroom_data_school = self.fetch_teacher_classroom_data_school(
+                    school_id=school_id,
+                    user_ids=None,
+                    pull_datetime=pull_datetime,
+                    format='list'
+                )
+                teacher_default_classroom_data.extend(teacher_default_classroom_data_school)
+                teacher_accessible_classroom_data.extend(teacher_accessible_classroom_data_school)
+        if format == 'dataframe':
+            teacher_default_classroom_data = convert_teacher_default_classroom_data_to_df(teacher_default_classroom_data)
+            teacher_accessible_classroom_data = convert_teacher_accessible_classroom_data_to_df(teacher_accessible_classroom_data)
+        elif format == 'list':
+            pass
+        else:
+            raise ValueError('Data format \'{}\' not recognized'.format(format))
+        return teacher_default_classroom_data, teacher_accessible_classroom_data
+
+    def fetch_teacher_classroom_data_school(
+        self,
+        school_id,
+        user_ids=None,
+        pull_datetime=None,
+        format='dataframe'
+    ):
+        school_id = int(school_id)
+        pull_datetime = wf_core_data.utils.to_datetime(pull_datetime)
+        if pull_datetime is None:
+            pull_datetime = datetime.datetime.now(tz=datetime.timezone.utc)
+        if user_ids is None:
+            user_ids = self.fetch_teacher_user_ids_school(school_id=school_id)
+        logger.info('Fetching teacher classroom association data from Transparent Classroom for school ID {} for {} teachers'.format(
+            school_id,
+            len(user_ids)
+        ))
+        teacher_default_classroom_data_school = list()
+        teacher_accessible_classroom_data_school = list()
+        for user_id in user_ids:
+            teacher_default_classroom_data_teacher, teacher_accessible_classroom_data_teacher = self.fetch_teacher_classroom_data_teacher(
+                school_id=school_id,
+                user_id=user_id,
+                pull_datetime=pull_datetime,
+                format='list'
+            )
+            teacher_default_classroom_data_school.extend(teacher_default_classroom_data_teacher)
+            teacher_accessible_classroom_data_school.extend(teacher_accessible_classroom_data_teacher)
+        if format == 'dataframe':
+            teacher_default_classroom_data_school = convert_teacher_default_classroom_data_to_df(teacher_default_classroom_data_school)
+            teacher_accessible_classroom_data_school = convert_teacher_accessible_classroom_data_to_df(teacher_accessible_classroom_data_school)
+        elif format == 'list':
+            pass
+        else:
+            raise ValueError('Data format \'{}\' not recognized'.format(format))
+        return teacher_default_classroom_data_school, teacher_accessible_classroom_data_school
+
+    def fetch_teacher_classroom_data_teacher(
+        self,
+        school_id,
+        user_id,
+        pull_datetime=None,
+        format='dataframe'
+    ):
+        school_id = int(school_id)
+        user_id = int(user_id)
+        pull_datetime = wf_core_data.utils.to_datetime(pull_datetime)
+        if pull_datetime is None:
+            pull_datetime = datetime.datetime.now(tz=datetime.timezone.utc)
+        logger.info('Fetching teacher classroom association data from Transparent Classroom for school ID {} and user id {}'.format(
+            school_id,
+            user_id
+        ))
+        teacher_datum = self.transparent_classroom_request(
+            'users/{}.json'.format(user_id),
+            school_id=school_id
+        )
+        if not isinstance(teacher_datum, dict):
+            raise ValueError('Received unexpected response from Transparent Classroom: {}'.format(
+                teacher_datum
+            ))
+        teacher_default_classroom_data_teacher = list()
+        teacher_accessible_classroom_data_teacher = list()
+        if teacher_datum.get('default_classroom_id') is not None:
+            teacher_default_classroom_datum = OrderedDict([
+                ('school_id_tc', school_id),
+                ('user_id_tc', teacher_datum.get('id')),
+                ('pull_datetime', pull_datetime),
+                ('teacher_default_classroom_id_tc', teacher_datum.get('default_classroom_id'))
+            ])
+            teacher_default_classroom_data_teacher.append(teacher_default_classroom_datum)
+        for accessible_classroom_id in teacher_datum.get('accessible_classroom_ids', []):
+            teacher_accessible_classroom_datum = OrderedDict([
+                ('school_id_tc', school_id),
+                ('user_id_tc', teacher_datum.get('id')),
+                ('pull_datetime', pull_datetime),
+                ('teacher_accessible_classroom_id_tc', accessible_classroom_id)
+            ])
+            teacher_accessible_classroom_data_teacher.append(teacher_accessible_classroom_datum)
+        if format == 'dataframe':
+            teacher_default_classroom_data_teacher = convert_teacher_default_classroom_data_to_df(teacher_default_classroom_data_teacher)
+            teacher_accessible_classroom_data_teacher = convert_teacher_accessible_classroom_data_to_df(teacher_accessible_classroom_data_teacher)
+        elif format == 'list':
+            pass
+        else:
+            raise ValueError('Data format \'{}\' not recognized'.format(format))
+        return teacher_default_classroom_data_teacher, teacher_accessible_classroom_data_teacher
+
+    def fetch_teacher_user_ids_school(
+        self,
+        school_id
+    ):
+        teachers_school = self.fetch_teacher_data_school(
+            school_id=school_id,
+            pull_datetime=None,
+            format='list'
+        )
+        teacher_user_ids_school = [teacher.get('user_id_tc') for teacher in teachers_school]
+        return teacher_user_ids_school
+
+    def fetch_teacher_data(
+        self,
+        school_ids=None,
+        pull_datetime=None,
+        format='dataframe'
+    ):
+        pull_datetime = wf_core_data.utils.to_datetime(pull_datetime)
+        if pull_datetime is None:
+            pull_datetime = datetime.datetime.now(tz=datetime.timezone.utc)
+        if school_ids is None:
+            school_ids=self.fetch_school_ids()
+        logger.info('Fetching teacher data from Transparent Classroom for {} schools'.format(len(school_ids)))
+        user_data = self.fetch_user_data(
+            school_ids=school_ids,
+            pull_datetime=pull_datetime,
+            format='list'
+        )
+        teacher_data = list(filter(lambda user: 'teacher' in user.get('user_roles_tc'), user_data))
+        if format == 'dataframe':
+            teacher_data = convert_user_data_to_df(teacher_data)
+        elif format == 'list':
+            pass
+        else:
+            raise ValueError('Data format \'{}\' not recognized'.format(format))
+        return teacher_data
+
+    def fetch_teacher_data_school(
+        self,
+        school_id,
+        pull_datetime=None,
+        format='dataframe'
+    ):
+        school_id = int(school_id)
+        pull_datetime = wf_core_data.utils.to_datetime(pull_datetime)
+        if pull_datetime is None:
+            pull_datetime = datetime.datetime.now(tz=datetime.timezone.utc)
+        logger.info('Fetching teacher data from Transparent Classroom for school ID {}'.format(
+            school_id
+        ))
+        user_data_school = self.fetch_user_data_school(
+            school_id=school_id,
+            pull_datetime=pull_datetime,
+            format='list'
+        )
+        teacher_data_school = list(filter(lambda user: 'teacher' in user.get('user_roles_tc'), user_data_school))
+        if format == 'dataframe':
+            teacher_data_school = convert_user_data_to_df(teacher_data_school)
+        elif format == 'list':
+            pass
+        else:
+            raise ValueError('Data format \'{}\' not recognized'.format(format))
+        return teacher_data_school
+
+    def fetch_parent_data(
+        self,
+        school_ids=None,
+        pull_datetime=None,
+        format='dataframe'
+    ):
+        pull_datetime = wf_core_data.utils.to_datetime(pull_datetime)
+        if pull_datetime is None:
+            pull_datetime = datetime.datetime.now(tz=datetime.timezone.utc)
+        if school_ids is None:
+            school_ids=self.fetch_school_ids()
+        logger.info('Fetching parent data from Transparent Classroom for {} schools'.format(len(school_ids)))
+        user_data = self.fetch_user_data(
+            school_ids=school_ids,
+            pull_datetime=pull_datetime,
+            format='list'
+        )
+        parent_data = list(filter(lambda user: 'parent' in user.get('user_roles_tc'), user_data))
+        if format == 'dataframe':
+            parent_data = convert_user_data_to_df(parent_data)
+        elif format == 'list':
+            pass
+        else:
+            raise ValueError('Data format \'{}\' not recognized'.format(format))
+        return parent_data
+
+    def fetch_parent_data_school(
+        self,
+        school_id,
+        pull_datetime=None,
+        format='dataframe'
+    ):
+        school_id = int(school_id)
+        pull_datetime = wf_core_data.utils.to_datetime(pull_datetime)
+        if pull_datetime is None:
+            pull_datetime = datetime.datetime.now(tz=datetime.timezone.utc)
+        logger.info('Fetching parent data from Transparent Classroom for school ID {}'.format(
+            school_id
+        ))
+        user_data_school = self.fetch_user_data_school(
+            school_id=school_id,
+            pull_datetime=pull_datetime,
+            format='list'
+        )
+        parent_data_school = list(filter(lambda user: 'parent' in user.get('user_roles_tc'), user_data_school))
+        if format == 'dataframe':
+            parent_data_school = convert_user_data_to_df(parent_data_school)
+        elif format == 'list':
+            pass
+        else:
+            raise ValueError('Data format \'{}\' not recognized'.format(format))
+        return parent_data_school
+
+    def fetch_user_data(
+        self,
+        school_ids=None,
+        pull_datetime=None,
+        format='dataframe'
+    ):
+        pull_datetime = wf_core_data.utils.to_datetime(pull_datetime)
+        if pull_datetime is None:
+            pull_datetime = datetime.datetime.now(tz=datetime.timezone.utc)
+        if school_ids is None:
+            school_ids=self.fetch_school_ids()
+        logger.info('Fetching user data from Transparent Classroom for {} schools'.format(len(school_ids)))
+        user_data = list()
+        for school_id in school_ids:
+            user_data_school = self.fetch_user_data_school(
+                school_id=school_id,
+                pull_datetime=pull_datetime,
+                format='list'
+            )
+            user_data.extend(user_data_school)
+        if format == 'dataframe':
+            user_data = convert_user_data_to_df(user_data)
+        elif format == 'list':
+            pass
+        else:
+            raise ValueError('Data format \'{}\' not recognized'.format(format))
+        return user_data
+
+    def fetch_user_data_school(
+        self,
+        school_id,
+        pull_datetime=None,
+        format='dataframe'
+    ):
+        school_id = int(school_id)
+        pull_datetime = wf_core_data.utils.to_datetime(pull_datetime)
+        if pull_datetime is None:
+            pull_datetime = datetime.datetime.now(tz=datetime.timezone.utc)
+        logger.info('Fetching user data from Transparent Classroom for school ID {}'.format(
+            school_id
+        ))
+        json_output = self.transparent_classroom_request(
+            'users.json',
+            school_id=school_id
+        )
+        if not isinstance(json_output, list):
+            raise ValueError('Received unexpected response from Transparent Classroom: {}'.format(
+                json_output
+            ))
+        user_data_school = list()
+        for datum in json_output:
+            user_datum = OrderedDict([
+                ('school_id_tc', school_id),
+                ('user_id_tc', datum.get('id')),
+                ('pull_datetime', pull_datetime),
+                ('user_first_name_tc', datum.get('first_name')),
+                ('user_last_name_tc', datum.get('last_name')),
+                ('user_email_tc', datum.get('email')),
+                ('user_roles_tc', datum.get('roles'))
+            ])
+            user_data_school.append(user_datum)
+        if format == 'dataframe':
+            user_data_school = convert_user_data_to_df(user_data_school)
+        elif format == 'list':
+            pass
+        else:
+            raise ValueError('Data format \'{}\' not recognized'.format(format))
+        return user_data_school
+
+    def fetch_classroom_data(
+        self,
+        school_ids=None,
+        pull_datetime=None,
+        format='dataframe'
+    ):
+        pull_datetime = wf_core_data.utils.to_datetime(pull_datetime)
+        if pull_datetime is None:
+            pull_datetime = datetime.datetime.now(tz=datetime.timezone.utc)
+        if school_ids is None:
+            school_ids=self.fetch_school_ids()
+        logger.info('Fetching classroom data from Transparent Classroom for {} schools'.format(len(school_ids)))
+        classroom_data = list()
+        for school_id in school_ids:
+            classroom_data_school = self.fetch_classroom_data_school(
+                school_id=school_id,
+                pull_datetime=pull_datetime,
+                format='list'
+            )
+            classroom_data.extend(classroom_data_school)
+        if format == 'dataframe':
+            classroom_data = convert_classroom_data_to_df(classroom_data)
+        elif format == 'list':
+            pass
+        else:
+            raise ValueError('Data format \'{}\' not recognized'.format(format))
+        return classroom_data
+
+    def fetch_classroom_data_school(
+        self,
+        school_id,
+        pull_datetime=None,
+        format='dataframe'
+    ):
+        school_id = int(school_id)
+        pull_datetime = wf_core_data.utils.to_datetime(pull_datetime)
+        if pull_datetime is None:
+            pull_datetime = datetime.datetime.now(tz=datetime.timezone.utc)
+        logger.info('Fetching classroom data from Transparent Classroom for school ID {}'.format(school_id))
+        json_output = self.transparent_classroom_request(
+            'classrooms.json',
+                params={
+                    'show_inactive': True
+                },
+            school_id=school_id
+        )
+        if not isinstance(json_output, list):
+            raise ValueError('Received unexpected response from Transparent Classroom: {}'.format(
+                json_output
+            ))
+        classroom_data_school=list()
+        for datum in json_output:
+            classroom_datum = OrderedDict([
+                ('school_id_tc', school_id),
+                ('classroom_id_tc', datum.get('id')),
+                ('pull_datetime', pull_datetime),
+                ('classroom_name_tc', datum.get('name')),
+                ('classroom_lesson_set_id_tc', datum.get('lesson_set_id')),
+                ('classroom_level_tc', datum.get('level')),
+                ('classroom_active_tc', wf_core_data.utils.to_boolean(datum.get('active')))
+            ])
+            classroom_data_school.append(classroom_datum)
+        if format == 'dataframe':
+            classroom_data_school = convert_classroom_data_to_df(classroom_data_school)
+        elif format == 'list':
+            pass
+        else:
+            raise ValueError('Data format \'{}\' not recognized'.format(format))
+        return classroom_data_school
+
+    def fetch_school_ids(self):
+        logger.info('Fetching school IDs for all schools')
+        school_data = self.fetch_school_data(
+            pull_datetime=None,
+            format='list'
+        )
+        school_ids = [school.get('school_id_tc') for school in school_data]
+        return school_ids
+
+    def fetch_school_data(
+        self,
+        pull_datetime=None,
+        format='dataframe'
+    ):
+        pull_datetime = wf_core_data.utils.to_datetime(pull_datetime)
+        if pull_datetime is None:
+            pull_datetime = datetime.datetime.now(tz=datetime.timezone.utc)
+        logger.info('Fetching school data from Transparent Classroom for all schools')
+        json_output = self.transparent_classroom_request('schools.json')
+        if not isinstance(json_output, list):
+            raise ValueError('Received unexpected response from Transparent Classroom: {}'.format(
+                json_output
+            ))
+        school_data=list()
+        for datum in json_output:
+            if datum.get('type') == 'School':
+                school_datum = OrderedDict([
+                    ('school_id_tc', datum.get('id')),
+                    ('pull_datetime', pull_datetime),
+                    ('school_name_tc', datum.get('name')),
+                    ('school_address_tc', datum.get('address')),
+                    ('school_phone_tc', datum.get('phone')),
+                    ('school_time_zone_tc', datum.get('time_zone'))
+                ])
+                school_data.append(school_datum)
+        if format == 'dataframe':
+            school_data = convert_school_data_to_df(school_data)
+        elif format == 'list':
+            pass
+        else:
+            raise ValueError('Data format \'{}\' not recognized'.format(format))
+        return school_data
 
     def transparent_classroom_request(
         self,
