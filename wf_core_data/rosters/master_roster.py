@@ -169,22 +169,6 @@ def fetch_master_roster_data(
         )
     )
     logger.info('Fetched data for {} target schools'.format(len(school_data)))
-    # school_data = (
-    #     school_data
-    #     .reindex(columns=[
-    #         'hub_short_name_wf',
-    #         'legal_entity_short_name_wf',
-    #         'school_short_name_wf',
-    #         'school_name_tc',
-    #         'school_zip_code_tc',
-    #         'school_state'
-    #     ])
-    #     .sort_values([
-    #         'hub_short_name_wf',
-    #         'legal_entity_short_name_wf',
-    #         'school_short_name_wf'
-    #     ])
-    # )
     ### Classroom data
     logger.info('Fetching classroom data from Transparent Classroom')
     classroom_data = (
@@ -199,14 +183,6 @@ def fetch_master_roster_data(
         )
     )
     logger.info('Fetched data for {} target classrooms'.format(len(classroom_data)))
-    # classroom_data = (
-    #     classroom_data
-    #     .reindex(columns=[
-    #         'classroom_short_name_wf',
-    #         'classroom_name_tc',
-    #         'teacher_id_tc'
-    #     ])
-    # )
     ### Student classroom data
     logger.info('Fetching student classroom association data from Transparent Classroom')
     student_classroom_data = (
@@ -219,7 +195,6 @@ def fetch_master_roster_data(
         )
         .reset_index(level='session_id_tc', drop=True)
         .reset_index(level='classroom_id_tc')
-        # .reindex(columns=['classroom_id_tc'])
     )
     logger.info('Fetched {} student classroom associations'.format(len(student_classroom_data)))
     ### Teacher data
@@ -240,13 +215,6 @@ def fetch_master_roster_data(
             'user_last_name_tc': 'teacher_last_name_tc',
             'user_email_tc': 'teacher_email_tc'
         })
-        # .reindex(columns=[
-        #     'teacher_short_name_wf',
-        #     'teacher_first_name_tc',
-        #     'teacher_last_name_tc',
-        #     'teacher_email_tc'
-        # ])
-        # .sort_index()
     )
     logger.info('Fetched data for {} target teachers'.format(len(teacher_data)))
     ### Student data
