@@ -38,7 +38,7 @@ def fetch_master_roster_data(
         )
     # Fetch target entity info
     ### Hubs
-    logger.info('Fetching target hub data')
+    logger.info('Fetching target hub info')
     hubs = pd.read_csv(
         os.path.join(
             base_directory,
@@ -49,9 +49,9 @@ def fetch_master_roster_data(
         ),
         index_col='hub_short_name_wf'
     )
-    logger.info('Fetched data for {} target hubs'.format(len(hubs)))
+    logger.info('Fetched info for {} target hubs'.format(len(hubs)))
     ### Legal entities
-    logger.info('Fetching target legal entity data')
+    logger.info('Fetching target legal entity info')
     legal_entities = pd.read_csv(
         os.path.join(
             base_directory,
@@ -62,9 +62,9 @@ def fetch_master_roster_data(
         ),
         index_col='legal_entity_short_name_wf'
     )
-    logger.info('Fetched data for {} target legal entities'.format(len(legal_entities)))
+    logger.info('Fetched info for {} target legal entities'.format(len(legal_entities)))
     ### Schools
-    logger.info('Fetching target school data')
+    logger.info('Fetching target school info')
     schools = pd.read_csv(
         os.path.join(
             base_directory,
@@ -75,9 +75,9 @@ def fetch_master_roster_data(
         ),
         index_col='school_id_tc'
     )
-    logger.info('Fetched data for {} target schools'.format(len(schools)))
+    logger.info('Fetched info for {} target schools'.format(len(schools)))
     ### Classrooms
-    logger.info('Fetching target classroom data')
+    logger.info('Fetching target classroom info')
     classrooms = pd.read_csv(
         os.path.join(
             base_directory,
@@ -88,9 +88,9 @@ def fetch_master_roster_data(
         ),
         index_col=['school_id_tc', 'classroom_id_tc']
     )
-    logger.info('Fetched data for {} target classrooms'.format(len(classrooms)))
+    logger.info('Fetched info for {} target classrooms'.format(len(classrooms)))
     ### Teachers
-    logger.info('Fetching target teacher data')
+    logger.info('Fetching target teacher info')
     teachers = pd.read_csv(
         os.path.join(
             base_directory,
@@ -101,9 +101,9 @@ def fetch_master_roster_data(
         ),
         index_col=['school_id_tc', 'teacher_id_tc']
     )
-    logger.info('Fetched data for {} target teachers'.format(len(teachers)))
+    logger.info('Fetched info for {} target teachers'.format(len(teachers)))
     ### Ethnicities
-    logger.info('Fetching target ethnicity data')
+    logger.info('Fetching target ethnicity info')
     ethnicities = pd.read_csv(
         os.path.join(
             base_directory,
@@ -114,10 +114,10 @@ def fetch_master_roster_data(
         ),
         index_col='ethnicity_short_name_wf'
     )
-    logger.info('Fetched data for {} target ethnicities'.format(len(ethnicities)))
+    logger.info('Fetched info for {} target ethnicities'.format(len(ethnicities)))
     ## Fetch mappings
     ### Ethnicity map
-    logger.info('Fetching ethnicity mapping data')
+    logger.info('Fetching ethnicity mapping info')
     ethnicity_map = pd.read_csv(
         os.path.join(
             base_directory,
@@ -128,9 +128,9 @@ def fetch_master_roster_data(
         ),
         index_col='ethnicity_tc'
     )
-    logger.info('Fetched mapping data for {} ethnicity values'.format(len(ethnicity_map)))
+    logger.info('Fetched mapping info for {} ethnicity values'.format(len(ethnicity_map)))
     ### Gender map
-    logger.info('Fetching gender mapping data')
+    logger.info('Fetching gender mapping info')
     gender_map = pd.read_csv(
         os.path.join(
             base_directory,
@@ -141,9 +141,9 @@ def fetch_master_roster_data(
         ),
         index_col='gender_tc'
     )
-    logger.info('Fetched mapping data for {} gender values'.format(len(gender_map)))
+    logger.info('Fetched mapping info for {} gender values'.format(len(gender_map)))
     ### Grade map
-    logger.info('Fetching grade mapping data')
+    logger.info('Fetching grade mapping info')
     grade_map = pd.read_csv(
         os.path.join(
             base_directory,
@@ -154,7 +154,7 @@ def fetch_master_roster_data(
         ),
         index_col='grade_tc_slugified'
     )
-    logger.info('Fetched mapping data for {} grade values'.format(len(grade_map)))
+    logger.info('Fetched mapping info for {} grade values'.format(len(grade_map)))
     ## Fetch data from Transparent Classroom
     ### School data
     logger.info('Fetching school data from Transparent Classroom')
