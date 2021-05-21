@@ -113,7 +113,7 @@ def create_fastbridge_roster(
             'teacher_id_tc': 'TeacherID',
             'teacher_first_name_tc': 'TeacherFirstName',
             'teacher_last_name_tc': 'TeacherLastName',
-            'teacher_email_tc':  'TeacherEmail',
+            'teacher_email_tc':  'TeacherEmail'
         })
     )
     # Create new fields
