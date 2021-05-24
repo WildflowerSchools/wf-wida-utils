@@ -34,3 +34,13 @@ def to_boolean(object):
             return False
         return None
     return None
+
+def extract_alphanumeric(object):
+    if pd.isna(object):
+        return None
+    try:
+        object_string = str(object)
+    except:
+        return None
+    alphanumeric_string = ''.join(ch for ch in object_string if ch.isalnum())
+    return alphanumeric_string
