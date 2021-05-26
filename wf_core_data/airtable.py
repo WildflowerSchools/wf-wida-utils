@@ -114,7 +114,6 @@ class AirtableClient:
                 ('school_phone_number_at', fields.get('Phone Number')),
                 ('school_location_ids_at', fields.get('Locations')),
                 ('school_time_zone_at', fields.get('Time Zone')),
-                ('school_tls_at', fields.get('TLs')),
                 ('school_id_tc', fields.get('TC_school_ID'))
             ])
             school_data.append(datum)
@@ -234,7 +233,6 @@ def convert_school_data_to_df(school_data):
         'school_governance_model_at': 'string',
         'school_phone_number_at': 'string',
         'school_time_zone_at': 'string',
-        'school_tls_at': 'string'
     })
     school_data_df.set_index('school_id_at', inplace=True)
     return school_data_df
