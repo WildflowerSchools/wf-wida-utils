@@ -27,6 +27,58 @@ class AirtableClient:
         if self.api_key is None:
             self.api_key = os.getenv('AIRTABLE_API_KEY')
 
+    def fetch_tl_data(
+        self,
+        pull_datetime=None,
+        params=None,
+        base_id=SCHOOLS_BASE_ID,
+        format='dataframe',
+        delay=DEFAULT_DELAY,
+        max_requests=DEFAULT_MAX_REQUESTS
+    ):
+        pull_datetime = wf_core_data.utils.to_datetime(pull_datetime)
+        if pull_datetime is None:
+            pull_datetime = datetime.datetime.now(tz=datetime.timezone.utc)
+        logger.info('Fetching TL data from Airtable')
+        records = self.bulk_get(
+            base_id=base_id,
+            endpoint='TLs',
+            params=params
+        )
+        tl_data=list()
+        for record in records:
+            fields = record.get('fields', {})
+            datum = OrderedDict([
+                ('teacher_id_at', record.get('id')),
+                ('teacher_created_datetime_at', wf_core_data.utils.to_datetime(record.get('createdTime'))),
+                ('pull_datetime', pull_datetime),
+                ('teacher_full_name_at', fields.get('Full Name')),
+                ('teacher_first_name_at', fields.get('First Name')),
+                ('teacher_middle_name_at', fields.get('Middle Name')),
+                ('teacher_last_name_at', fields.get('Last Name')),
+                ('teacher_title_at', fields.get('Title')),
+                ('teacher_ethnicity_at', fields.get('Race & Ethnicity')),
+                ('teacher_ethnicity_other_at', fields.get('Race & Ethnicity - Other')),
+                ('teacher_income_background_at', fields.get('Income Background')),
+                ('teacher_email_at', fields.get('Email')),
+                ('teacher_email_2_at', fields.get('Email 2')),
+                ('teacher_email_3_at', fields.get('Email 3')),
+                ('teacher_phone_at', fields.get('Phone Number')),
+                ('teacher_phone_2_at', fields.get('Phone Number 2')),
+                ('teacher_employer_at', fields.get('Employer')),
+                ('hub_at', fields.get('Hub')),
+                ('pod_at', fields.get('Pod')),
+                ('user_id_tc', fields.get('TC User ID'))
+            ])
+            tl_data.append(datum)
+        if format == 'dataframe':
+            tl_data = convert_tl_data_to_df(tl_data)
+        elif format == 'list':
+            pass
+        else:
+            raise ValueError('Data format \'{}\' not recognized'.format(format))
+        return tl_data
+
     def fetch_school_data(
         self,
         pull_datetime=None,
@@ -39,7 +91,7 @@ class AirtableClient:
         pull_datetime = wf_core_data.utils.to_datetime(pull_datetime)
         if pull_datetime is None:
             pull_datetime = datetime.datetime.now(tz=datetime.timezone.utc)
-        logger.info('Fetching school data from Transparent Classroom for all schools')
+        logger.info('Fetching school data from Airtable')
         records = self.bulk_get(
             base_id=base_id,
             endpoint='Schools',
@@ -130,6 +182,37 @@ class AirtableClient:
             error_message = 'Airtable GET request returned status code {}'.format(r.status_code)
             r.raise_for_status()
         return r.json()
+
+def convert_tl_data_to_df(tl_data):
+    if len(tl_data) == 0:
+        return pd.DataFrame()
+    tl_data_df = pd.DataFrame(
+        tl_data,
+        dtype='object'
+    )
+    tl_data_df['pull_datetime'] = pd.to_datetime(tl_data_df['pull_datetime'])
+    tl_data_df['teacher_created_datetime_at'] = pd.to_datetime(tl_data_df['teacher_created_datetime_at'])
+    # school_data_df['user_id_tc'] = pd.to_numeric(tl_data_df['user_id_tc']).astype('Int64')
+    tl_data_df = tl_data_df.astype({
+        'teacher_full_name_at': 'string',
+        'teacher_middle_name_at': 'string',
+        'teacher_last_name_at': 'string',
+        'teacher_title_at': 'string',
+        'teacher_ethnicity_at': 'string',
+        'teacher_ethnicity_other_at': 'string',
+        'teacher_income_background_at': 'string',
+        'teacher_email_at': 'string',
+        'teacher_email_2_at': 'string',
+        'teacher_email_3_at': 'string',
+        'teacher_phone_at': 'string',
+        'teacher_phone_2_at': 'string',
+        'teacher_employer_at': 'string',
+        'hub_at': 'string',
+        'pod_at': 'string',
+        'user_id_tc': 'string'
+    })
+    tl_data_df.set_index('teacher_id_at', inplace=True)
+    return tl_data_df
 
 def convert_school_data_to_df(school_data):
     if len(school_data) == 0:
