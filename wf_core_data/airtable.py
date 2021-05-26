@@ -79,6 +79,45 @@ class AirtableClient:
             raise ValueError('Data format \'{}\' not recognized'.format(format))
         return tl_data
 
+    def fetch_location_data(
+        self,
+        pull_datetime=None,
+        params=None,
+        base_id=SCHOOLS_BASE_ID,
+        format='dataframe',
+        delay=DEFAULT_DELAY,
+        max_requests=DEFAULT_MAX_REQUESTS
+    ):
+        pull_datetime = wf_core_data.utils.to_datetime(pull_datetime)
+        if pull_datetime is None:
+            pull_datetime = datetime.datetime.now(tz=datetime.timezone.utc)
+        logger.info('Fetching location data from Airtable')
+        records = self.bulk_get(
+            base_id=base_id,
+            endpoint='Locations',
+            params=params
+        )
+        location_data=list()
+        for record in records:
+            fields = record.get('fields', {})
+            datum = OrderedDict([
+                ('location_id_at', record.get('id')),
+                ('location_created_datetime_at', wf_core_data.utils.to_datetime(record.get('createdTime'))),
+                ('pull_datetime', pull_datetime),
+                ('location_address_at', fields.get('Address')),
+                ('school_id_at', wf_core_data.utils.to_singleton(fields.get('School Name'))),
+                ('school_location_start_at', wf_core_data.utils.to_date(fields.get('Start of time at location'))),
+                ('school_location_end_at', wf_core_data.utils.to_date(fields.get('End of time at location')))
+            ])
+            location_data.append(datum)
+        if format == 'dataframe':
+            location_data = convert_location_data_to_df(location_data)
+        elif format == 'list':
+            pass
+        else:
+            raise ValueError('Data format \'{}\' not recognized'.format(format))
+        return location_data
+
     def fetch_school_data(
         self,
         pull_datetime=None,
@@ -212,6 +251,23 @@ def convert_tl_data_to_df(tl_data):
     })
     tl_data_df.set_index('teacher_id_at', inplace=True)
     return tl_data_df
+
+def convert_location_data_to_df(location_data):
+    if len(location_data) == 0:
+        return pd.DataFrame()
+    location_data_df = pd.DataFrame(
+        location_data,
+        dtype='object'
+    )
+    location_data_df['pull_datetime'] = pd.to_datetime(location_data_df['pull_datetime'])
+    location_data_df['location_created_datetime_at'] = pd.to_datetime(location_data_df['location_created_datetime_at'])
+    location_data_df = location_data_df.astype({
+        'location_id_at': 'string',
+        'location_address_at': 'string',
+        'school_id_at': 'string'
+    })
+    location_data_df.set_index('location_id_at', inplace=True)
+    return location_data_df
 
 def convert_school_data_to_df(school_data):
     if len(school_data) == 0:
