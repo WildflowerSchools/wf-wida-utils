@@ -238,6 +238,29 @@ class AirtableClient:
             time.sleep(delay)
         return records
 
+    def post(
+        self,
+        base_id,
+        endpoint,
+        data
+    ):
+        headers = dict()
+        if self.api_key is not None:
+            headers['Authorization'] = 'Bearer {}'.format(self.api_key)
+        r = requests.post(
+            '{}{}/{}'.format(
+                self.url_base,
+                base_id,
+                endpoint
+            ),
+            headers=headers,
+            json=data
+        )
+        if r.status_code != 200:
+            error_message = 'Airtable POST request returned status code {}'.format(r.status_code)
+            r.raise_for_status()
+        return r.json()
+
     def get(
         self,
         base_id,
