@@ -118,6 +118,46 @@ class AirtableClient:
             raise ValueError('Data format \'{}\' not recognized'.format(format))
         return location_data
 
+    def fetch_teacher_school_data(
+        self,
+        pull_datetime=None,
+        params=None,
+        base_id=SCHOOLS_BASE_ID,
+        format='dataframe',
+        delay=DEFAULT_DELAY,
+        max_requests=DEFAULT_MAX_REQUESTS
+    ):
+        pull_datetime = wf_core_data.utils.to_datetime(pull_datetime)
+        if pull_datetime is None:
+            pull_datetime = datetime.datetime.now(tz=datetime.timezone.utc)
+        logger.info('Fetching teacher school association data from Airtable')
+        records = self.bulk_get(
+            base_id=base_id,
+            endpoint='Teachers x Schools',
+            params=params
+        )
+        teacher_school_data=list()
+        for record in records:
+            fields = record.get('fields', {})
+            datum = OrderedDict([
+                ('teacher_school_id_at', record.get('id')),
+                ('teacher_school_created_datetime_at', wf_core_data.utils.to_datetime(record.get('createdTime'))),
+                ('pull_datetime', pull_datetime),
+                ('teacher_id_at', fields.get('TL')),
+                ('school_id_at', fields.get('School')),
+                ('teacher_school_start_at', wf_core_data.utils.to_date(fields.get('Start Date'))),
+                ('teacher_school_end_at', wf_core_data.utils.to_date(fields.get('End Date'))),
+                ('teacher_school_active_at', wf_core_data.utils.to_boolean(fields.get('Currently Active')))
+            ])
+            teacher_school_data.append(datum)
+        if format == 'dataframe':
+            teacher_school_data = convert_teacher_school_data_to_df(teacher_school_data)
+        elif format == 'list':
+            pass
+        else:
+            raise ValueError('Data format \'{}\' not recognized'.format(format))
+        return teacher_school_data
+
     def fetch_school_data(
         self,
         pull_datetime=None,
@@ -268,6 +308,21 @@ def convert_location_data_to_df(location_data):
     })
     location_data_df.set_index('location_id_at', inplace=True)
     return location_data_df
+
+def convert_teacher_school_data_to_df(teacher_school_data):
+    if len(teacher_school_data) == 0:
+        return pd.DataFrame()
+    teacher_school_data_df = pd.DataFrame(
+        teacher_school_data,
+        dtype='object'
+    )
+    teacher_school_data_df['pull_datetime'] = pd.to_datetime(teacher_school_data_df['pull_datetime'])
+    teacher_school_data_df['teacher_school_created_datetime_at'] = pd.to_datetime(teacher_school_data_df['teacher_school_created_datetime_at'])
+    teacher_school_data_df = teacher_school_data_df.astype({
+        'teacher_school_active_at': 'bool'
+    })
+    teacher_school_data_df.set_index('teacher_school_id_at', inplace=True)
+    return teacher_school_data_df
 
 def convert_school_data_to_df(school_data):
     if len(school_data) == 0:
