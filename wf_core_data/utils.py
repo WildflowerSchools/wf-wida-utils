@@ -18,6 +18,17 @@ def to_date(object):
         date = None
     return date
 
+def to_singleton(object):
+    try:
+        num_elements = len(object)
+        if num_elements > 1:
+            raise ValueError('More than one element in object. Conversion to singleton failed')
+        if num_elements == 0:
+            return None
+        return object[0]
+    except:
+        return object
+
 def to_boolean(object):
     if isinstance(object, bool):
         return object

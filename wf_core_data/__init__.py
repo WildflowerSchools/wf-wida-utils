@@ -1,5 +1,6 @@
 from .google_sheets import *
 from .transparent_classroom import *
+from .airtable import *
 from .rosters.master_roster import *
 from .rosters.nwea_roster import *
 from .rosters.fastbridge_roster import *
