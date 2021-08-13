@@ -6,16 +6,16 @@ import logging
 logger = logging.getLogger(__name__)
 
 MEFS_TARGET_COLUMN_NAMES = [
-    'First Name',
-    'Last Name',
-    'Child ID',
-    'Birth Month Year',
+    'FirstName',
+    'LastName',
+    'ChildID',
+    'BirthMonthYear',
     'Gender',
-    'Special Education Services',
+    'SpecialEducationServices',
     'Ethnicity',
-    'Second Language Learner',
-    'Postal Code',
-    'Country Code',
+    'SecondLanguageLearner',
+    'PostalCode',
+    'CountryCode',
     'Notes',
     'Class'
 ]
@@ -87,9 +87,9 @@ def create_mefs_roster(
     mefs_roster = (
         master_roster
         .rename(columns = {
-            'student_first_name_tc': 'First Name',
-            'student_last_name_tc': 'Last Name',
-            'school_zip_code_tc': 'Postal Code'
+            'student_first_name_tc': 'FirstName',
+            'student_last_name_tc': 'LastName',
+            'school_zip_code_tc': 'PostalCode'
         })
     )
     # Create new fields
@@ -108,19 +108,19 @@ def create_mefs_roster(
             mefs_id_map,
             how='left'
         )
-        .rename(columns={'student_id_mefs_wf': 'Child ID'})
+        .rename(columns={'student_id_mefs_wf': 'ChildID'})
     )
-    num_new_mefs_ids = mefs_roster['Child ID'].isna().sum()
+    num_new_mefs_ids = mefs_roster['ChildID'].isna().sum()
     logger.info('There appear to be {} records without MEFS child IDs. Generating.'.format(
         num_new_mefs_ids
     ))
-    mefs_roster['Child ID'] = mefs_roster['Child ID'].apply(
+    mefs_roster['ChildID'] = mefs_roster['ChildID'].apply(
         lambda x: x if pd.notna(x) else str(uuid.uuid4())[-10:]
     )
     mefs_ids_new = (
         mefs_roster
-        .loc[:, ['Child ID']]
-        .rename(columns={'Child ID': 'student_id_mefs_wf'})
+        .loc[:, ['ChildID']]
+        .rename(columns={'ChildID': 'student_id_mefs_wf'})
         .reset_index()
         .set_index('student_id_mefs_wf')
     )
@@ -146,7 +146,7 @@ def create_mefs_roster(
     ))
     ## Student birth date
     logger.info('Creating birth month and year field')
-    mefs_roster['Birth Month Year'] = mefs_roster['student_birth_date_tc'].apply(
+    mefs_roster['BirthMonthYear'] = mefs_roster['student_birth_date_tc'].apply(
         lambda x: x.strftime('%Y-%m-%d')
     )
     ## Student gender
@@ -156,7 +156,7 @@ def create_mefs_roster(
     )
     ## Special education services
     logger.info('Creating special education services field')
-    mefs_roster['Special Education Services'] = 'Unknown'
+    mefs_roster['SpecialEducationServices'] = 'Unknown'
     ## Student ethnicity
     logger.info('Creating ethnicity field')
     def student_ethnicity_mefs(ethnicity_list):
@@ -172,10 +172,10 @@ def create_mefs_roster(
     mefs_roster['Ethnicity'] = mefs_roster['student_ethnicity_wf'].apply(student_ethnicity_mefs)
     ## Second language learner
     logger.info('Creating second language learner field')
-    mefs_roster['Second Language Learner'] = 'Unknown'
+    mefs_roster['SecondLanguageLearner'] = 'Unknown'
     ## Country code
     logger.info('Creating country code field')
-    mefs_roster['Country Code'] = 'US'
+    mefs_roster['CountryCode'] = 'US'
     ## Arrange columns and rows
     logger.info('Rearranging columns and rows')
     mefs_roster = (
@@ -186,7 +186,7 @@ def create_mefs_roster(
         ))
         .sort_values(
             wf_core_data.rosters.shared_constants.GROUPING_COLUMN_NAMES +
-            ['First Name', 'Last Name']
+            ['FirstName', 'LastName']
         )
     )
     # Create output
