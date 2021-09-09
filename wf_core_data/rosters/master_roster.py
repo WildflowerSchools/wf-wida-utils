@@ -162,7 +162,7 @@ def fetch_master_roster_data(
         transparent_classroom_client.fetch_school_data(
             pull_datetime=pull_datetime,
             format='dataframe'
-    )
+        )
         .join(
             schools,
             how='inner'
