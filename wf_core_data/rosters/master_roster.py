@@ -11,7 +11,6 @@ logger = logging.getLogger(__name__)
 
 def fetch_master_roster_data(
     base_directory,
-    pull_datetime=None,
     transparent_classroom_client=None,
     transparent_classroom_username=None,
     transparent_classroom_password=None,
@@ -27,8 +26,6 @@ def fetch_master_roster_data(
     ethnicity_map_path_stem = 'ethnicity_map',
     grade_map_path_stem = 'grade_map'
 ):
-    if pull_datetime is None:
-        pull_datetime = datetime.datetime.now(tz=datetime.timezone.utc)
     if transparent_classroom_client is None:
         transparent_classroom_client = wf_core_data.transparent_classroom.TransparentClassroomClient(
             username=transparent_classroom_username,
@@ -36,6 +33,7 @@ def fetch_master_roster_data(
             api_token=transparent_classroom_api_token,
             url_base=transparent_classroom_url_base
         )
+    pull_datetime = datetime.datetime.now(tz=datetime.timezone.utc)
     # Fetch target entity info
     ### Hubs
     logger.info('Fetching target hub info')
@@ -361,3 +359,43 @@ def fetch_master_roster_data(
         ])
     )
     return master_roster_data
+
+def write_master_roster_data_local(
+    master_roster_data,
+    base_directory,
+    subdirectory='master_rosters',
+    filename_stem='master_roster',
+    filename_suffix=None
+):
+    if filename_suffix is None:
+        filename_suffix = datetime.datetime.now(tz=datetime.timezone.utc).strftime('%Y%m%d')
+    logger.info('Filename suffix is {}'.format(filename_suffix))
+    output_directory = os.path.join(
+        base_directory,
+        subdirectory,
+        '{}_{}'.format(
+            filename_stem,
+            filename_suffix
+        )
+    )
+    os.makedirs(output_directory, exist_ok=True)
+    logger.info('Writing pickle file')
+    master_roster_data.to_pickle(
+        os.path.join(
+            output_directory,
+            '{}_{}.pkl'.format(
+                filename_stem,
+                filename_suffix
+            )
+        )
+    )
+    logger.info('Writing CSV file')
+    master_roster_data.to_csv(
+        os.path.join(
+            output_directory,
+            '{}_{}.csv'.format(
+                filename_stem,
+                filename_suffix
+            )
+        )
+    )
