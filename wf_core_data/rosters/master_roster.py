@@ -8,8 +8,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-
-def fetch_master_roster_data(
+def fetch_master_roster_data_and_write_local(
     base_directory,
     transparent_classroom_client=None,
     transparent_classroom_username=None,
@@ -24,7 +23,52 @@ def fetch_master_roster_data(
     ethnicity_info_path_stem = 'ethnicity_info',
     gender_map_path_stem = 'gender_map',
     ethnicity_map_path_stem = 'ethnicity_map',
-    grade_map_path_stem = 'grade_map'
+    grade_map_path_stem = 'grade_map',
+    subdirectory='master_rosters',
+    filename_stem='master_roster',
+    filename_suffix=None
+):
+    master_roster_data = fetch_master_roster_data(
+        base_directory=base_directory,
+        transparent_classroom_client=transparent_classroom_client,
+        transparent_classroom_username=transparent_classroom_username,
+        transparent_classroom_password=transparent_classroom_password,
+        transparent_classroom_api_token=transparent_classroom_api_token,
+        transparent_classroom_url_base=transparent_classroom_url_base,
+        hub_info_path_stem=hub_info_path_stem,
+        legal_entity_info_path_stem=legal_entity_info_path_stem,
+        school_info_path_stem=school_info_path_stem,
+        classroom_info_path_stem=classroom_info_path_stem,
+        teacher_info_path_stem=teacher_info_path_stem,
+        ethnicity_info_path_stem=ethnicity_info_path_stem,
+        gender_map_path_stem=gender_map_path_stem,
+        ethnicity_map_path_stem=ethnicity_map_path_stem,
+        grade_map_path_stem=grade_map_path_stem
+    )
+    write_master_roster_data_local(
+        master_roster_data=master_roster_data,
+        base_directory=base_directory,
+        subdirectory=subdirectory,
+        filename_stem=filename_stem,
+        filename_suffix=filename_suffix
+    )
+
+def fetch_master_roster_data(
+    base_directory,
+    transparent_classroom_client=None,
+    transparent_classroom_username=None,
+    transparent_classroom_password=None,
+    transparent_classroom_api_token=None,
+    transparent_classroom_url_base='https://www.transparentclassroom.com/api/v1/',
+    hub_info_path_stem='hub_info',
+    legal_entity_info_path_stem='legal_entity_info',
+    school_info_path_stem='school_info',
+    classroom_info_path_stem='classroom_info',
+    teacher_info_path_stem='teacher_info',
+    ethnicity_info_path_stem='ethnicity_info',
+    gender_map_path_stem='gender_map',
+    ethnicity_map_path_stem='ethnicity_map',
+    grade_map_path_stem='grade_map'
 ):
     if transparent_classroom_client is None:
         transparent_classroom_client = wf_core_data.transparent_classroom.TransparentClassroomClient(
