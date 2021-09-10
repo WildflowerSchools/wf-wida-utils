@@ -1,5 +1,6 @@
 import wf_core_data.rosters.shared_constants
 import pandas as pd
+import os
 import logging
 
 logger = logging.getLogger(__name__)
@@ -82,13 +83,45 @@ FOUNTAS_PINNELL_TESTABLE_GRADES = [
     '12'
 ]
 
+def create_fountas_pinnell_roster_and_write_locally(
+    base_directory,
+    filename_suffix,
+    master_roster_subdirectory='master_rosters',
+    master_roster_filename_stem='master_roster',
+    fountas_pinnell_roster_subdirectory='fountas_pinnell_rosters',
+    fountas_pinnell_roster_filename_stem='fountas_pinnell_roster',
+):
+    filename = os.path.join(
+        base_directory,
+        master_roster_subdirectory,
+        '{}_{}'.format(
+            master_roster_filename_stem,
+            filename_suffix
+        ),
+        '{}_{}.pkl'.format(
+            master_roster_filename_stem,
+            filename_suffix
+        )
+    )
+    master_roster_data = pd.read_pickle(filename)
+    fountas_pinnell_roster_data = wf_core_data.create_fountas_pinnell_roster(
+        master_roster_data=master_roster_data
+    )
+    wf_core_data.write_fountas_pinnell_rosters_local(
+        fountas_pinnell_roster_data=fountas_pinnell_roster_data,
+        base_directory=base_directory,
+        subdirectory=fountas_pinnell_roster_subdirectory,
+        filename_stem=fountas_pinnell_roster_filename_stem,
+        filename_suffix=filename_suffix
+    )
+
 def create_fountas_pinnell_roster(
-    master_roster
+    master_roster_data
 ):
     # Rename fields
     logger.info('Renaming fields')
-    fountas_pinnell_roster = (
-        master_roster
+    fountas_pinnell_roster_data = (
+        master_roster_data
         .rename(columns = {
             'student_first_name_tc': '## First Name',
             'student_last_name_tc': 'Last Name'
@@ -97,7 +130,7 @@ def create_fountas_pinnell_roster(
     # Create new fields
     ## Student ID
     logger.info('Creating student ID field')
-    fountas_pinnell_roster['Student ID'] = fountas_pinnell_roster.apply(
+    fountas_pinnell_roster_data['Student ID'] = fountas_pinnell_roster_data.apply(
         lambda row: '{}-{}'.format(
             row.name[0],
             row.name[1]
@@ -106,17 +139,17 @@ def create_fountas_pinnell_roster(
     )
     ## Student birth date
     logger.info('Creating birth date field')
-    fountas_pinnell_roster['DOB'] = fountas_pinnell_roster['student_birth_date_tc'].apply(
+    fountas_pinnell_roster_data['DOB'] = fountas_pinnell_roster_data['student_birth_date_tc'].apply(
         lambda x: x.strftime('%m/%d/%Y')
     )
     ## Student gender
     logger.info('Creating gender field')
-    fountas_pinnell_roster['Gender'] = fountas_pinnell_roster['student_gender_wf'].apply(
+    fountas_pinnell_roster_data['Gender'] = fountas_pinnell_roster_data['student_gender_wf'].apply(
         lambda x: FOUNTAS_PINNELL_GENDER_MAP.get(x, FOUNTAS_PINNELL_GENDER_MAP.get('unmatched_value')) if pd.notna(x) else FOUNTAS_PINNELL_GENDER_MAP.get('na_value')
     )
     ## Grade
     logger.info('Creating grade field')
-    fountas_pinnell_roster['Grade'] = fountas_pinnell_roster['student_grade_wf'].apply(
+    fountas_pinnell_roster_data['Grade'] = fountas_pinnell_roster_data['student_grade_wf'].apply(
         lambda x: FOUNTAS_PINNELL_GRADE_NAME_MAP.get(x, FOUNTAS_PINNELL_GRADE_NAME_MAP.get('unmatched_value')) if pd.notna(x) else FOUNTAS_PINNELL_GRADE_NAME_MAP.get('na_value')
     )
     ## Student ethnicity
@@ -127,13 +160,13 @@ def create_fountas_pinnell_roster(
         if len(ethnicity_list) > 1:
             return FOUNTAS_PINNELL_ETHNICITY_MAP.get('multiple_values')
         return FOUNTAS_PINNELL_ETHNICITY_MAP.get(ethnicity_list[0], FOUNTAS_PINNELL_ETHNICITY_MAP.get('unmatched_value'))
-    fountas_pinnell_roster['Race/Ethnicity'] = fountas_pinnell_roster['student_ethnicity_wf'].apply(student_race_fountas_pinnell)
+    fountas_pinnell_roster_data['Race/Ethnicity'] = fountas_pinnell_roster_data['student_ethnicity_wf'].apply(student_race_fountas_pinnell)
     ### Language
-    fountas_pinnell_roster['Language'] = 'English'
+    fountas_pinnell_roster_data['Language'] = 'English'
     ## Arrange columns and rows
     logger.info('Rearranging columns and rows')
-    fountas_pinnell_roster = (
-        fountas_pinnell_roster
+    fountas_pinnell_roster_data = (
+        fountas_pinnell_roster_data
         .reindex(columns=(
             wf_core_data.rosters.shared_constants.GROUPING_COLUMN_NAMES +
             FOUNTAS_PINNELL_TARGET_COLUMN_NAMES
@@ -145,16 +178,194 @@ def create_fountas_pinnell_roster(
     )
     # Create output
     logger.info('Restriction to testable grades. {} student records before restricting'.format(
-        len(fountas_pinnell_roster)
+        len(fountas_pinnell_roster_data)
     ))
-    fountas_pinnell_roster = (
-        fountas_pinnell_roster
-        .loc[fountas_pinnell_roster['Grade'].isin(FOUNTAS_PINNELL_TESTABLE_GRADES)]
+    fountas_pinnell_roster_data = (
+        fountas_pinnell_roster_data
+        .loc[fountas_pinnell_roster_data['Grade'].isin(FOUNTAS_PINNELL_TESTABLE_GRADES)]
         .copy()
         .reset_index(drop=True)
         .astype('object')
     )
     logger.info('Restricted to testable grades. {} student records after restricting'.format(
-        len(fountas_pinnell_roster)
+        len(fountas_pinnell_roster_data)
     ))
-    return fountas_pinnell_roster
+    return fountas_pinnell_roster_data
+
+def write_fountas_pinnell_rosters_local(
+    fountas_pinnell_roster_data,
+    base_directory,
+    subdirectory='fountas_pinnell_rosters',
+    filename_stem='fountas_pinnell_roster',
+    filename_suffix=None
+
+):
+    if filename_suffix is None:
+        filename_suffix = datetime.datetime.now(tz=datetime.timezone.utc).strftime('%Y%m%d')
+    logger.info('Filename suffix is {}'.format(filename_suffix))
+    output_directory_base = os.path.join(
+        base_directory,
+        subdirectory,
+        '{}_{}'.format(
+            filename_stem,
+            filename_suffix
+        )
+    )
+    output_directory_csv = os.path.join(
+        output_directory_base,
+        'csv'
+    )
+    output_directory_pickle = os.path.join(
+        output_directory_base,
+        'pickle'
+    )
+    output_directory_excel = os.path.join(
+        output_directory_base,
+        'excel'
+    )
+    os.makedirs(output_directory_csv, exist_ok=True)
+    os.makedirs(output_directory_pickle, exist_ok=True)
+    os.makedirs(output_directory_excel, exist_ok=True)
+    output = (
+        fountas_pinnell_roster_data
+        .drop(columns=wf_core_data.rosters.shared_constants.GROUPING_COLUMN_NAMES)
+    )
+    filename = '{}_{}'.format(
+        filename_stem,
+        filename_suffix
+    )
+    output.to_csv(
+        os.path.join(
+            output_directory_csv,
+            '{}.csv'.format(
+                filename
+            )
+        ),
+        index = False
+    )
+    output.to_pickle(
+        os.path.join(
+            output_directory_pickle,
+            '{}.pkl'.format(
+                filename
+            )
+        )
+    )
+    output.to_excel(
+        os.path.join(
+            output_directory_excel,
+            '{}.xlsx'.format(
+                filename
+            )
+        )
+    )
+
+    for legal_entity_short_name, roster_df_group in fountas_pinnell_roster_data.groupby('legal_entity_short_name_wf'):
+        output = (
+            roster_df_group
+            .drop(columns=wf_core_data.rosters.shared_constants.GROUPING_COLUMN_NAMES)
+        )
+        filename = '{}_{}_{}'.format(
+            filename_stem,
+            legal_entity_short_name,
+            filename_suffix
+        )
+        output.to_csv(
+            os.path.join(
+                output_directory_csv,
+                '{}.csv'.format(
+                    filename
+                )
+            ),
+            index = False
+        )
+        output.to_pickle(
+            os.path.join(
+                output_directory_pickle,
+                '{}.pkl'.format(
+                    filename
+                )
+            )
+        )
+        output.to_excel(
+            os.path.join(
+                output_directory_excel,
+                '{}.xlsx'.format(
+                    filename
+                )
+            )
+        )
+
+    for school_short_name, roster_df_group in fountas_pinnell_roster_data.groupby('school_short_name_wf'):
+        output = (
+            roster_df_group
+            .drop(columns=wf_core_data.rosters.shared_constants.GROUPING_COLUMN_NAMES)
+        )
+        filename = '{}_{}_{}'.format(
+            filename_stem,
+            school_short_name,
+            filename_suffix
+        )
+        output.to_csv(
+            os.path.join(
+                output_directory_csv,
+                '{}.csv'.format(
+                    filename
+                )
+            ),
+            index = False
+        )
+        output.to_pickle(
+            os.path.join(
+                output_directory_pickle,
+                '{}.pkl'.format(
+                    filename
+                )
+            )
+        )
+        output.to_excel(
+            os.path.join(
+                output_directory_excel,
+                '{}.xlsx'.format(
+                    filename
+                )
+            ),
+            index=False
+        )
+
+    for classroom_short_name, roster_df_group in fountas_pinnell_roster_data.groupby('classroom_short_name_wf'):
+        output = (
+            roster_df_group
+            .drop(columns=wf_core_data.rosters.shared_constants.GROUPING_COLUMN_NAMES)
+        )
+        filename = '{}_{}_{}'.format(
+            filename_stem,
+            classroom_short_name,
+            filename_suffix
+        )
+        output.to_csv(
+            os.path.join(
+                output_directory_csv,
+                '{}.csv'.format(
+                    filename
+                )
+            ),
+            index = False
+        )
+        output.to_pickle(
+            os.path.join(
+                output_directory_pickle,
+                '{}.pkl'.format(
+                    filename
+                )
+            )
+        )
+        output.to_excel(
+            os.path.join(
+                output_directory_excel,
+                '{}.xlsx'.format(
+                    filename
+                )
+            ),
+            index=False
+        )
