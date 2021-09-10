@@ -1,5 +1,6 @@
 import wf_core_data.rosters.shared_constants
 import pandas as pd
+import os
 import logging
 
 logger = logging.getLogger(__name__)
@@ -90,14 +91,45 @@ NWEA_TESTABLE_GRADES = [
     '12'
 ]
 
+def create_nwea_roster_and_write_locally(
+    base_directory,
+    filename_suffix,
+    master_roster_subdirectory='master_rosters',
+    master_roster_filename_stem='master_roster',
+    nwea_roster_subdirectory='nwea_rosters',
+    nwea_roster_filename_stem='nwea_roster',
+):
+    filename = os.path.join(
+        base_directory,
+        master_roster_subdirectory,
+        '{}_{}'.format(
+            master_roster_filename_stem,
+            filename_suffix
+        ),
+        '{}_{}.pkl'.format(
+            master_roster_filename_stem,
+            filename_suffix
+        )
+    )
+    master_roster_data = pd.read_pickle(filename)
+    nwea_roster_data = wf_core_data.create_nwea_roster(
+        master_roster_data=master_roster_data
+    )
+    wf_core_data.write_nwea_rosters_local(
+        nwea_roster_data=nwea_roster_data,
+        base_directory=base_directory,
+        subdirectory=nwea_roster_subdirectory,
+        filename_stem=nwea_roster_filename_stem,
+        filename_suffix=filename_suffix
+    )
 
 def create_nwea_roster(
-    master_roster
+    master_roster_data
 ):
     # Rename fields
     logger.info('Renaming fields')
-    nwea_roster = (
-        master_roster
+    nwea_roster_data = (
+        master_roster_data
         .rename(columns = {
             'school_name_tc': 'School Name',
             'classroom_name_tc': 'Class Name',
@@ -113,23 +145,23 @@ def create_nwea_roster(
     # Create new fields
     ## User name
     logger.info('Creating user name field')
-    nwea_roster['User Name'] = nwea_roster['Email Address']
+    nwea_roster_data['User Name'] = nwea_roster_data['Email Address']
     ## Student ID
     logger.info('Creating student ID field')
-    nwea_roster['Student ID'] = nwea_roster.index.get_level_values('student_id_tc')
+    nwea_roster_data['Student ID'] = nwea_roster_data.index.get_level_values('student_id_tc')
     ## Student birth date
     logger.info('Creating birth date field')
-    nwea_roster['Student Date Of Birth'] = nwea_roster['student_birth_date_tc'].apply(
+    nwea_roster_data['Student Date Of Birth'] = nwea_roster_data['student_birth_date_tc'].apply(
         lambda x: x.strftime('%m/%d/%Y')
     )
     ## Student gender
     logger.info('Creating gender field')
-    nwea_roster['Student Gender'] = nwea_roster['student_gender_wf'].apply(
+    nwea_roster_data['Student Gender'] = nwea_roster_data['student_gender_wf'].apply(
         lambda x: NWEA_GENDER_MAP.get(x, NWEA_GENDER_MAP.get('unmatched_value')) if pd.notna(x) else NWEA_GENDER_MAP.get('na_value')
     )
     ## Grade
     logger.info('Creating grade field')
-    nwea_roster['Student Grade'] = nwea_roster['student_grade_wf'].apply(
+    nwea_roster_data['Student Grade'] = nwea_roster_data['student_grade_wf'].apply(
         lambda x: NWEA_GRADE_NAME_MAP.get(x, NWEA_GRADE_NAME_MAP.get('unmatched_value')) if pd.notna(x) else NWEA_GRADE_NAME_MAP.get('na_value')
     )
     ## Student ethnicity
@@ -140,11 +172,11 @@ def create_nwea_roster(
         if len(ethnicity_list) > 1:
             return NWEA_ETHNICITY_MAP.get('multiple_values')
         return NWEA_ETHNICITY_MAP.get(ethnicity_list[0], NWEA_ETHNICITY_MAP.get('unmatched_value'))
-    nwea_roster['Student Ethnic Group Name'] = nwea_roster['student_ethnicity_wf'].apply(student_race_nwea)
+    nwea_roster_data['Student Ethnic Group Name'] = nwea_roster_data['student_ethnicity_wf'].apply(student_race_nwea)
     ## Arrange columns and rows
     logger.info('Rearranging columns and rows')
-    nwea_roster = (
-        nwea_roster
+    nwea_roster_data = (
+        nwea_roster_data
         .reindex(columns=(
             wf_core_data.rosters.shared_constants.GROUPING_COLUMN_NAMES +
             NWEA_TARGET_COLUMN_NAMES
@@ -156,16 +188,194 @@ def create_nwea_roster(
     )
     # Create output
     logger.info('Restriction to testable grades. {} student records before restricting'.format(
-        len(nwea_roster)
+        len(nwea_roster_data)
     ))
-    nwea_roster = (
-        nwea_roster
-        .loc[nwea_roster['Student Grade'].isin(NWEA_TESTABLE_GRADES)]
+    nwea_roster_data = (
+        nwea_roster_data
+        .loc[nwea_roster_data['Student Grade'].isin(NWEA_TESTABLE_GRADES)]
         .copy()
         .reset_index(drop=True)
         .astype('object')
     )
     logger.info('Restricted to testable grades. {} student records after restricting'.format(
-        len(nwea_roster)
+        len(nwea_roster_data)
     ))
-    return nwea_roster
+    return nwea_roster_data
+
+def write_nwea_rosters_local(
+    nwea_roster_data,
+    base_directory,
+    subdirectory='nwea_rosters',
+    filename_stem='nwea_roster',
+    filename_suffix=None
+
+):
+    if filename_suffix is None:
+        filename_suffix = datetime.datetime.now(tz=datetime.timezone.utc).strftime('%Y%m%d')
+    logger.info('Filename suffix is {}'.format(filename_suffix))
+    output_directory_base = os.path.join(
+        base_directory,
+        subdirectory,
+        '{}_{}'.format(
+            filename_stem,
+            filename_suffix
+        )
+    )
+    output_directory_csv = os.path.join(
+        output_directory_base,
+        'csv'
+    )
+    output_directory_pickle = os.path.join(
+        output_directory_base,
+        'pickle'
+    )
+    output_directory_excel = os.path.join(
+        output_directory_base,
+        'excel'
+    )
+    os.makedirs(output_directory_csv, exist_ok=True)
+    os.makedirs(output_directory_pickle, exist_ok=True)
+    os.makedirs(output_directory_excel, exist_ok=True)
+    output = (
+        nwea_roster_data
+        .drop(columns=wf_core_data.rosters.shared_constants.GROUPING_COLUMN_NAMES)
+    )
+    filename = '{}_{}'.format(
+        filename_stem,
+        filename_suffix
+    )
+    output.to_csv(
+        os.path.join(
+            output_directory_csv,
+            '{}.csv'.format(
+                filename
+            )
+        ),
+        index = False
+    )
+    output.to_pickle(
+        os.path.join(
+            output_directory_pickle,
+            '{}.pkl'.format(
+                filename
+            )
+        )
+    )
+    output.to_excel(
+        os.path.join(
+            output_directory_excel,
+            '{}.xlsx'.format(
+                filename
+            )
+        )
+    )
+
+    for legal_entity_short_name, roster_df_group in nwea_roster_data.groupby('legal_entity_short_name_wf'):
+        output = (
+            roster_df_group
+            .drop(columns=wf_core_data.rosters.shared_constants.GROUPING_COLUMN_NAMES)
+        )
+        filename = '{}_{}_{}'.format(
+            filename_stem,
+            legal_entity_short_name,
+            filename_suffix
+        )
+        output.to_csv(
+            os.path.join(
+                output_directory_csv,
+                '{}.csv'.format(
+                    filename
+                )
+            ),
+            index = False
+        )
+        output.to_pickle(
+            os.path.join(
+                output_directory_pickle,
+                '{}.pkl'.format(
+                    filename
+                )
+            )
+        )
+        output.to_excel(
+            os.path.join(
+                output_directory_excel,
+                '{}.xlsx'.format(
+                    filename
+                )
+            )
+        )
+
+    for school_short_name, roster_df_group in nwea_roster_data.groupby('school_short_name_wf'):
+        output = (
+            roster_df_group
+            .drop(columns=wf_core_data.rosters.shared_constants.GROUPING_COLUMN_NAMES)
+        )
+        filename = '{}_{}_{}'.format(
+            filename_stem,
+            school_short_name,
+            filename_suffix
+        )
+        output.to_csv(
+            os.path.join(
+                output_directory_csv,
+                '{}.csv'.format(
+                    filename
+                )
+            ),
+            index = False
+        )
+        output.to_pickle(
+            os.path.join(
+                output_directory_pickle,
+                '{}.pkl'.format(
+                    filename
+                )
+            )
+        )
+        output.to_excel(
+            os.path.join(
+                output_directory_excel,
+                '{}.xlsx'.format(
+                    filename
+                )
+            ),
+            index=False
+        )
+
+    for classroom_short_name, roster_df_group in nwea_roster_data.groupby('classroom_short_name_wf'):
+        output = (
+            roster_df_group
+            .drop(columns=wf_core_data.rosters.shared_constants.GROUPING_COLUMN_NAMES)
+        )
+        filename = '{}_{}_{}'.format(
+            filename_stem,
+            classroom_short_name,
+            filename_suffix
+        )
+        output.to_csv(
+            os.path.join(
+                output_directory_csv,
+                '{}.csv'.format(
+                    filename
+                )
+            ),
+            index = False
+        )
+        output.to_pickle(
+            os.path.join(
+                output_directory_pickle,
+                '{}.pkl'.format(
+                    filename
+                )
+            )
+        )
+        output.to_excel(
+            os.path.join(
+                output_directory_excel,
+                '{}.xlsx'.format(
+                    filename
+                )
+            ),
+            index=False
+        )
