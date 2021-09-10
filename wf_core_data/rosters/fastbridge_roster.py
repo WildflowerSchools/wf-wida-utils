@@ -96,6 +96,38 @@ FASTBRIDGE_TESTABLE_GRADES = [
     '12'
 ]
 
+def create_fastbridge_roster_and_write_locally(
+    base_directory,
+    filename_suffix,
+    master_roster_subdirectory='master_rosters',
+    master_roster_filename_stem='master_roster',
+    fastbridge_roster_subdirectory='fastbridge_rosters',
+    fastbridge_roster_filename_stem='fastbridge_roster',
+):
+    filename = os.path.join(
+        base_directory,
+        master_roster_subdirectory,
+        '{}_{}'.format(
+            master_roster_filename_stem,
+            filename_suffix
+        ),
+        '{}_{}.pkl'.format(
+            master_roster_filename_stem,
+            filename_suffix
+        )
+    )
+    master_roster_data = pd.read_pickle(filename)
+    fastbridge_roster_data = wf_core_data.create_fastbridge_roster(
+        master_roster_data=master_roster_data
+    )
+    wf_core_data.write_fastbridge_rosters_local(
+        fastbridge_roster_data=fastbridge_roster_data,
+        base_directory=base_directory,
+        subdirectory=fastbridge_roster_subdirectory,
+        filename_stem=fastbridge_roster_filename_stem,
+        filename_suffix=filename_suffix
+    )
+
 def create_fastbridge_roster(
     master_roster_data
 ):
