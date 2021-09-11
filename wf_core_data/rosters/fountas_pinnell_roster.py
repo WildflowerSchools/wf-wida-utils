@@ -89,7 +89,7 @@ def create_fountas_pinnell_roster_and_write_locally(
     master_roster_subdirectory='master_rosters',
     master_roster_filename_stem='master_roster',
     fountas_pinnell_roster_subdirectory='fountas_pinnell_rosters',
-    fountas_pinnell_roster_filename_stem='fountas_pinnell_roster',
+    fountas_pinnell_roster_filename_stem='fountas_pinnell_roster'
 ):
     filename = os.path.join(
         base_directory,
@@ -259,7 +259,6 @@ def write_fountas_pinnell_rosters_local(
             )
         )
     )
-
     for legal_entity_short_name, roster_df_group in fountas_pinnell_roster_data.groupby('legal_entity_short_name_wf'):
         output = (
             roster_df_group
@@ -295,7 +294,6 @@ def write_fountas_pinnell_rosters_local(
                 )
             )
         )
-
     for school_short_name, roster_df_group in fountas_pinnell_roster_data.groupby('school_short_name_wf'):
         output = (
             roster_df_group
@@ -332,7 +330,6 @@ def write_fountas_pinnell_rosters_local(
             ),
             index=False
         )
-
     for classroom_short_name, roster_df_group in fountas_pinnell_roster_data.groupby('classroom_short_name_wf'):
         output = (
             roster_df_group

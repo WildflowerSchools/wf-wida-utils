@@ -102,7 +102,7 @@ def create_fastbridge_roster_and_write_locally(
     master_roster_subdirectory='master_rosters',
     master_roster_filename_stem='master_roster',
     fastbridge_roster_subdirectory='fastbridge_rosters',
-    fastbridge_roster_filename_stem='fastbridge_roster',
+    fastbridge_roster_filename_stem='fastbridge_roster'
 ):
     filename = os.path.join(
         base_directory,
@@ -275,7 +275,6 @@ def write_fastbridge_rosters_local(
             )
         )
     )
-
     for legal_entity_short_name, roster_df_group in fastbridge_roster_data.groupby('legal_entity_short_name_wf'):
         output = (
             roster_df_group
@@ -311,7 +310,6 @@ def write_fastbridge_rosters_local(
                 )
             )
         )
-
     for school_short_name, roster_df_group in fastbridge_roster_data.groupby('school_short_name_wf'):
         output = (
             roster_df_group
@@ -348,7 +346,6 @@ def write_fastbridge_rosters_local(
             ),
             index=False
         )
-
     for classroom_short_name, roster_df_group in fastbridge_roster_data.groupby('classroom_short_name_wf'):
         output = (
             roster_df_group

@@ -338,7 +338,6 @@ def write_mefs_rosters_local(
             )
         )
     )
-
     for legal_entity_short_name, roster_df_group in mefs_roster_data.groupby('legal_entity_short_name_wf'):
         output = (
             roster_df_group
@@ -374,7 +373,6 @@ def write_mefs_rosters_local(
                 )
             )
         )
-
     for school_short_name, roster_df_group in mefs_roster_data.groupby('school_short_name_wf'):
         output = (
             roster_df_group
@@ -411,7 +409,6 @@ def write_mefs_rosters_local(
             ),
             index=False
         )
-
     for classroom_short_name, roster_df_group in mefs_roster_data.groupby('classroom_short_name_wf'):
         output = (
             roster_df_group
