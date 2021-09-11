@@ -155,6 +155,9 @@ def create_mefs_roster(
     # Create new fields
     ## Child ID
     logger.info('Creating child ID field')
+    logger.info('Current MEFS ID list contains {} IDs'.format(
+        len(mefs_ids)
+    ))
     mefs_id_map = (
         mefs_ids
         .copy()
@@ -162,47 +165,58 @@ def create_mefs_roster(
         .dropna(subset=['school_id_tc', 'student_id_tc'])
         .set_index(['school_id_tc', 'student_id_tc'])
     )
+    logger.info('Of these {} MEFS IDs, {} IDs correspond to Transparent Classroom IDs'.format(
+        len(mefs_ids),
+        len(mefs_id_map)
+
+    ))
+    new_tc_ids = mefs_roster_data.index.difference(mefs_id_map.index)
+    num_additional_mefs_ids = len(new_tc_ids)
+    logger.info('Master roster contains {} Transparent Classroom IDs not in current MEFS IDs'.format(
+        num_additional_mefs_ids
+    ))
+    logger.info('Generating new MEFS IDs')
+    while True:
+        additional_mefs_id_map = pd.DataFrame(
+            {'student_id_mefs_wf': [str(uuid.uuid4())[-10:] for _ in range(num_additional_mefs_ids)]},
+            index=new_tc_ids
+        )
+        new_mefs_id_map = pd.concat((
+            mefs_id_map,
+            additional_mefs_id_map
+        ))
+        if not new_mefs_id_map['student_id_mefs_wf'].duplicated().any():
+            break
+        logger.info('New MEFS ID list contains {} duplicates. Regenerating.'.format(
+            new_mefs_id_map['student_id_mefs_wf'].duplicated().sum()
+        ))
     mefs_roster_data = (
         mefs_roster_data
         .join(
-            mefs_id_map,
+            new_mefs_id_map,
             how='left'
         )
         .rename(columns={'student_id_mefs_wf': 'ChildID'})
     )
-    num_new_mefs_ids = mefs_roster_data['ChildID'].isna().sum()
-    logger.info('There appear to be {} records without MEFS child IDs. Generating.'.format(
-        num_new_mefs_ids
+    additional_mefs_ids = (
+        additional_mefs_id_map
+        .reset_index()
+        .set_index('student_id_mefs_wf')
+    )
+    new_mefs_ids = pd.concat((
+        mefs_ids,
+        additional_mefs_ids
     ))
-    mefs_roster_data['ChildID'] = mefs_roster_data['ChildID'].apply(
-        lambda x: x if pd.notna(x) else str(uuid.uuid4())[-10:]
-    )
-    mefs_ids_new = (
-        mefs_roster_data
-        .loc[:, ['ChildID']]
-        .rename(columns={'ChildID': 'student_id_mefs_wf'})
-        .reset_index()
-        .set_index('student_id_mefs_wf')
-    )
-    mefs_ids_combined = (
-        pd.concat((
-            mefs_ids,
-            mefs_ids_new
-        ))
-        .reset_index()
-        .drop_duplicates()
-        .set_index('student_id_mefs_wf')
-    )
-    if len(mefs_ids_combined) - len(mefs_ids) != num_new_mefs_ids:
+    if len(new_mefs_ids) - len(mefs_ids) != num_additional_mefs_ids:
         raise ValueError('{} MEFS child IDs were provided and {} new IDs were generated but new table contains {} IDs'.format(
             len(mefs_ids),
-            num_new_mefs_ids,
-            len(mefs_ids_combined)
+            num_additional_mefs_ids,
+            len(new_mefs_ids)
         ))
     logger.info('Provided MEFS child ID table contained {} IDs. {} new IDs were generated. New MEFS child ID table contains {} IDs'.format(
         len(mefs_ids),
-        num_new_mefs_ids,
-        len(mefs_ids_combined)
+        num_additional_mefs_ids,
+        len(new_mefs_ids)
     ))
     ## Student birth date
     logger.info('Creating birth month and year field')
@@ -255,7 +269,7 @@ def create_mefs_roster(
         .reset_index(drop=True)
         .astype('object')
     )
-    return mefs_roster_data, mefs_ids_combined
+    return mefs_roster_data, new_mefs_ids
 
 def write_mefs_rosters_local(
     mefs_roster_data,
