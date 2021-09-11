@@ -142,7 +142,7 @@ def create_mefs_roster(
     master_roster_data,
     mefs_ids
 ):
-    # Rename fields
+    ## Rename fields
     logger.info('Renaming fields')
     mefs_roster_data = (
         master_roster_data
@@ -152,8 +152,8 @@ def create_mefs_roster(
             'school_zip_code_tc': 'PostalCode'
         })
     )
-    # Create new fields
-    ## Child ID
+    ## Create new fields
+    ### Child ID
     logger.info('Creating child ID field')
     logger.info('Current MEFS ID list contains {} IDs'.format(
         len(mefs_ids)
@@ -218,20 +218,20 @@ def create_mefs_roster(
         num_additional_mefs_ids,
         len(new_mefs_ids)
     ))
-    ## Student birth date
+    ### Student birth date
     logger.info('Creating birth month and year field')
     mefs_roster_data['BirthMonthYear'] = mefs_roster_data['student_birth_date_tc'].apply(
         lambda x: x.strftime('%Y-%m-%d')
     )
-    ## Student gender
+    ### Student gender
     logger.info('Creating gender field')
     mefs_roster_data['Gender'] = mefs_roster_data['student_gender_wf'].apply(
         lambda x: MEFS_GENDER_MAP.get(x, MEFS_GENDER_MAP.get('unmatched_value')) if pd.notna(x) else MEFS_GENDER_MAP.get('na_value')
     )
-    ## Special education services
+    ### Special education services
     logger.info('Creating special education services field')
     mefs_roster_data['SpecialEducationServices'] = 'Unknown'
-    ## Student ethnicity
+    ### Student ethnicity
     logger.info('Creating ethnicity field')
     def student_ethnicity_mefs(ethnicity_list):
         if not isinstance(ethnicity_list, list):
@@ -244,10 +244,10 @@ def create_mefs_roster(
         ethnicity_string_mefs = '|'.join(sorted(list(set(ethnicity_list_mefs))))
         return ethnicity_string_mefs
     mefs_roster_data['Ethnicity'] = mefs_roster_data['student_ethnicity_wf'].apply(student_ethnicity_mefs)
-    ## Second language learner
+    ### Second language learner
     logger.info('Creating second language learner field')
     mefs_roster_data['SecondLanguageLearner'] = 'Unknown'
-    ## Country code
+    ### Country code
     logger.info('Creating country code field')
     mefs_roster_data['CountryCode'] = 'US'
     ## Arrange columns and rows
@@ -263,7 +263,7 @@ def create_mefs_roster(
             ['FirstName', 'LastName']
         )
     )
-    # Create output
+    ## Create output
     mefs_roster_data = (
         mefs_roster_data
         .reset_index(drop=True)

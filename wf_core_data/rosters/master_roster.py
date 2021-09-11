@@ -78,7 +78,7 @@ def fetch_master_roster_data(
             url_base=transparent_classroom_url_base
         )
     pull_datetime = datetime.datetime.now(tz=datetime.timezone.utc)
-    # Fetch target entity info
+    ## Fetch target entity info
     ### Hubs
     logger.info('Fetching target hub info')
     hubs = pd.read_csv(
@@ -321,7 +321,7 @@ def fetch_master_roster_data(
     master_roster_data['student_gender_wf'] = master_roster_data['student_gender_tc'].apply(
         lambda x: gender_map_dict.get(x, None) if not pd.isna(x) else None
     )
-    ## Normalized ethnicity
+    ### Normalized ethnicity
     logger.info('Constructing normalized ethnicity field')
     student_ethnicity_wf = (
         master_roster_data['student_ethnicity_tc']
@@ -344,7 +344,7 @@ def fetch_master_roster_data(
             how='left'
         )
     )
-    ### Noralized grade
+    ### Normalized grade
     logger.info('Constructing normalized grade field')
     grade_map_dict = grade_map['grade_short_name_wf'].to_dict()
     def extract_grade_name(row):

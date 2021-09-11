@@ -131,7 +131,7 @@ def create_fastbridge_roster_and_write_locally(
 def create_fastbridge_roster(
     master_roster_data
 ):
-    # Rename fields
+    ## Rename fields
     logger.info('Renaming fields')
     fastbridge_roster_data = (
         master_roster_data
@@ -149,28 +149,28 @@ def create_fastbridge_roster(
             'teacher_email_tc':  'TeacherEmail'
         })
     )
-    # Create new fields
-    ## Section
+    ## Create new fields
+    ### Section
     fastbridge_roster_data['Section'] = 'S1'
-    ## Student ID
+    ### Student ID
     logger.info('Creating student ID field')
     fastbridge_roster_data['StudentID'] = fastbridge_roster_data.index.get_level_values('student_id_tc')
-    ## Student birth date
+    ### Student birth date
     logger.info('Creating birth date field')
     fastbridge_roster_data['StudentBirthDate'] = fastbridge_roster_data['student_birth_date_tc'].apply(
         lambda x: x.strftime('%m/%d/%Y')
     )
-    ## Student gender
+    ### Student gender
     logger.info('Creating gender field')
     fastbridge_roster_data['StudentGender'] = fastbridge_roster_data['student_gender_wf'].apply(
         lambda x: FASTBRIDGE_GENDER_MAP.get(x, FASTBRIDGE_GENDER_MAP.get('unmatched_value')) if pd.notna(x) else FASTBRIDGE_GENDER_MAP.get('na_value')
     )
-    ## Grade
+    ### Grade
     logger.info('Creating grade field')
     fastbridge_roster_data['Grade'] = fastbridge_roster_data['student_grade_wf'].apply(
         lambda x: FASTBRIDGE_GRADE_NAME_MAP.get(x, FASTBRIDGE_GRADE_NAME_MAP.get('unmatched_value')) if pd.notna(x) else FASTBRIDGE_GRADE_NAME_MAP.get('na_value')
     )
-    ## Student ethnicity
+    ### Student ethnicity
     logger.info('Creating ethnicity field')
     def student_race_fastbridge(ethnicity_list):
         if not isinstance(ethnicity_list, list):
@@ -192,7 +192,7 @@ def create_fastbridge_roster(
             ['Grade', 'StudentFirstName', 'StudentLastName']
         )
     )
-    # Create output
+    ## Create output
     logger.info('Restriction to testable grades. {} student records before restricting'.format(
         len(fastbridge_roster_data)
     ))

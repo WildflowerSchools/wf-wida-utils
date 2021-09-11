@@ -126,7 +126,7 @@ def create_nwea_roster_and_write_locally(
 def create_nwea_roster(
     master_roster_data
 ):
-    # Rename fields
+    ## Rename fields
     logger.info('Renaming fields')
     nwea_roster_data = (
         master_roster_data
@@ -142,29 +142,29 @@ def create_nwea_roster(
             'student_last_name_tc': 'Student Last Name',
         })
     )
-    # Create new fields
-    ## User name
+    ## Create new fields
+    ### User name
     logger.info('Creating user name field')
     nwea_roster_data['User Name'] = nwea_roster_data['Email Address']
-    ## Student ID
+    ### Student ID
     logger.info('Creating student ID field')
     nwea_roster_data['Student ID'] = nwea_roster_data.index.get_level_values('student_id_tc')
-    ## Student birth date
+    ### Student birth date
     logger.info('Creating birth date field')
     nwea_roster_data['Student Date Of Birth'] = nwea_roster_data['student_birth_date_tc'].apply(
         lambda x: x.strftime('%m/%d/%Y')
     )
-    ## Student gender
+    ### Student gender
     logger.info('Creating gender field')
     nwea_roster_data['Student Gender'] = nwea_roster_data['student_gender_wf'].apply(
         lambda x: NWEA_GENDER_MAP.get(x, NWEA_GENDER_MAP.get('unmatched_value')) if pd.notna(x) else NWEA_GENDER_MAP.get('na_value')
     )
-    ## Grade
+    ### Grade
     logger.info('Creating grade field')
     nwea_roster_data['Student Grade'] = nwea_roster_data['student_grade_wf'].apply(
         lambda x: NWEA_GRADE_NAME_MAP.get(x, NWEA_GRADE_NAME_MAP.get('unmatched_value')) if pd.notna(x) else NWEA_GRADE_NAME_MAP.get('na_value')
     )
-    ## Student ethnicity
+    ### Student ethnicity
     logger.info('Creating ethnicity field')
     def student_race_nwea(ethnicity_list):
         if not isinstance(ethnicity_list, list):
@@ -186,7 +186,7 @@ def create_nwea_roster(
             ['Student Grade', 'Student First Name', 'Student Last Name']
         )
     )
-    # Create output
+    ## Create output
     logger.info('Restriction to testable grades. {} student records before restricting'.format(
         len(nwea_roster_data)
     ))

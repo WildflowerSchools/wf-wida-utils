@@ -118,7 +118,7 @@ def create_fountas_pinnell_roster_and_write_locally(
 def create_fountas_pinnell_roster(
     master_roster_data
 ):
-    # Rename fields
+    ## Rename fields
     logger.info('Renaming fields')
     fountas_pinnell_roster_data = (
         master_roster_data
@@ -127,8 +127,8 @@ def create_fountas_pinnell_roster(
             'student_last_name_tc': 'Last Name'
         })
     )
-    # Create new fields
-    ## Student ID
+    ## Create new fields
+    ### Student ID
     logger.info('Creating student ID field')
     fountas_pinnell_roster_data['Student ID'] = fountas_pinnell_roster_data.apply(
         lambda row: '{}-{}'.format(
@@ -137,22 +137,22 @@ def create_fountas_pinnell_roster(
         ),
         axis=1
     )
-    ## Student birth date
+    ### Student birth date
     logger.info('Creating birth date field')
     fountas_pinnell_roster_data['DOB'] = fountas_pinnell_roster_data['student_birth_date_tc'].apply(
         lambda x: x.strftime('%m/%d/%Y')
     )
-    ## Student gender
+    ### Student gender
     logger.info('Creating gender field')
     fountas_pinnell_roster_data['Gender'] = fountas_pinnell_roster_data['student_gender_wf'].apply(
         lambda x: FOUNTAS_PINNELL_GENDER_MAP.get(x, FOUNTAS_PINNELL_GENDER_MAP.get('unmatched_value')) if pd.notna(x) else FOUNTAS_PINNELL_GENDER_MAP.get('na_value')
     )
-    ## Grade
+    ### Grade
     logger.info('Creating grade field')
     fountas_pinnell_roster_data['Grade'] = fountas_pinnell_roster_data['student_grade_wf'].apply(
         lambda x: FOUNTAS_PINNELL_GRADE_NAME_MAP.get(x, FOUNTAS_PINNELL_GRADE_NAME_MAP.get('unmatched_value')) if pd.notna(x) else FOUNTAS_PINNELL_GRADE_NAME_MAP.get('na_value')
     )
-    ## Student ethnicity
+    ### Student ethnicity
     logger.info('Creating ethnicity field')
     def student_race_fountas_pinnell(ethnicity_list):
         if not isinstance(ethnicity_list, list):
@@ -176,7 +176,7 @@ def create_fountas_pinnell_roster(
             ['Grade', '## First Name', 'Last Name']
         )
     )
-    # Create output
+    ## Create output
     logger.info('Restriction to testable grades. {} student records before restricting'.format(
         len(fountas_pinnell_roster_data)
     ))
