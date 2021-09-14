@@ -8,10 +8,8 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-
-def fetch_master_roster_data(
+def fetch_master_roster_data_and_write_local(
     base_directory,
-    pull_datetime=None,
     transparent_classroom_client=None,
     transparent_classroom_username=None,
     transparent_classroom_password=None,
@@ -25,10 +23,53 @@ def fetch_master_roster_data(
     ethnicity_info_path_stem = 'ethnicity_info',
     gender_map_path_stem = 'gender_map',
     ethnicity_map_path_stem = 'ethnicity_map',
-    grade_map_path_stem = 'grade_map'
+    grade_map_path_stem = 'grade_map',
+    subdirectory='master_rosters',
+    filename_stem='master_roster',
+    filename_suffix=None
 ):
-    if pull_datetime is None:
-        pull_datetime = datetime.datetime.now(tz=datetime.timezone.utc)
+    master_roster_data = fetch_master_roster_data(
+        base_directory=base_directory,
+        transparent_classroom_client=transparent_classroom_client,
+        transparent_classroom_username=transparent_classroom_username,
+        transparent_classroom_password=transparent_classroom_password,
+        transparent_classroom_api_token=transparent_classroom_api_token,
+        transparent_classroom_url_base=transparent_classroom_url_base,
+        hub_info_path_stem=hub_info_path_stem,
+        legal_entity_info_path_stem=legal_entity_info_path_stem,
+        school_info_path_stem=school_info_path_stem,
+        classroom_info_path_stem=classroom_info_path_stem,
+        teacher_info_path_stem=teacher_info_path_stem,
+        ethnicity_info_path_stem=ethnicity_info_path_stem,
+        gender_map_path_stem=gender_map_path_stem,
+        ethnicity_map_path_stem=ethnicity_map_path_stem,
+        grade_map_path_stem=grade_map_path_stem
+    )
+    write_master_roster_data_local(
+        master_roster_data=master_roster_data,
+        base_directory=base_directory,
+        subdirectory=subdirectory,
+        filename_stem=filename_stem,
+        filename_suffix=filename_suffix
+    )
+
+def fetch_master_roster_data(
+    base_directory,
+    transparent_classroom_client=None,
+    transparent_classroom_username=None,
+    transparent_classroom_password=None,
+    transparent_classroom_api_token=None,
+    transparent_classroom_url_base='https://www.transparentclassroom.com/api/v1/',
+    hub_info_path_stem='hub_info',
+    legal_entity_info_path_stem='legal_entity_info',
+    school_info_path_stem='school_info',
+    classroom_info_path_stem='classroom_info',
+    teacher_info_path_stem='teacher_info',
+    ethnicity_info_path_stem='ethnicity_info',
+    gender_map_path_stem='gender_map',
+    ethnicity_map_path_stem='ethnicity_map',
+    grade_map_path_stem='grade_map'
+):
     if transparent_classroom_client is None:
         transparent_classroom_client = wf_core_data.transparent_classroom.TransparentClassroomClient(
             username=transparent_classroom_username,
@@ -36,7 +77,8 @@ def fetch_master_roster_data(
             api_token=transparent_classroom_api_token,
             url_base=transparent_classroom_url_base
         )
-    # Fetch target entity info
+    pull_datetime = datetime.datetime.now(tz=datetime.timezone.utc)
+    ## Fetch target entity info
     ### Hubs
     logger.info('Fetching target hub info')
     hubs = pd.read_csv(
@@ -162,7 +204,7 @@ def fetch_master_roster_data(
         transparent_classroom_client.fetch_school_data(
             pull_datetime=pull_datetime,
             format='dataframe'
-    )
+        )
         .join(
             schools,
             how='inner'
@@ -279,7 +321,7 @@ def fetch_master_roster_data(
     master_roster_data['student_gender_wf'] = master_roster_data['student_gender_tc'].apply(
         lambda x: gender_map_dict.get(x, None) if not pd.isna(x) else None
     )
-    ## Normalized ethnicity
+    ### Normalized ethnicity
     logger.info('Constructing normalized ethnicity field')
     student_ethnicity_wf = (
         master_roster_data['student_ethnicity_tc']
@@ -302,7 +344,7 @@ def fetch_master_roster_data(
             how='left'
         )
     )
-    ### Noralized grade
+    ### Normalized grade
     logger.info('Constructing normalized grade field')
     grade_map_dict = grade_map['grade_short_name_wf'].to_dict()
     def extract_grade_name(row):
@@ -361,3 +403,43 @@ def fetch_master_roster_data(
         ])
     )
     return master_roster_data
+
+def write_master_roster_data_local(
+    master_roster_data,
+    base_directory,
+    subdirectory='master_rosters',
+    filename_stem='master_roster',
+    filename_suffix=None
+):
+    if filename_suffix is None:
+        filename_suffix = datetime.datetime.now(tz=datetime.timezone.utc).strftime('%Y%m%d')
+    logger.info('Filename suffix is {}'.format(filename_suffix))
+    output_directory = os.path.join(
+        base_directory,
+        subdirectory,
+        '{}_{}'.format(
+            filename_stem,
+            filename_suffix
+        )
+    )
+    os.makedirs(output_directory, exist_ok=True)
+    logger.info('Writing pickle file')
+    master_roster_data.to_pickle(
+        os.path.join(
+            output_directory,
+            '{}_{}.pkl'.format(
+                filename_stem,
+                filename_suffix
+            )
+        )
+    )
+    logger.info('Writing CSV file')
+    master_roster_data.to_csv(
+        os.path.join(
+            output_directory,
+            '{}_{}.csv'.format(
+                filename_stem,
+                filename_suffix
+            )
+        )
+    )
