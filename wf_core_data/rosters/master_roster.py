@@ -115,7 +115,8 @@ def fetch_master_roster_data(
                 'csv'
             ])
         ),
-        index_col='school_id_tc'
+        index_col='school_id_tc',
+        dtype='object'
     )
     logger.info('Fetched info for {} target schools'.format(len(schools)))
     ### Classrooms
@@ -369,6 +370,10 @@ def fetch_master_roster_data(
             'school_name_tc',
             'school_zip_code_tc',
             'school_state',
+            'district_id_wida',
+            'district_name_wida',
+            'school_id_wida',
+            'school_name_wida',
             'classroom_id_tc',
             'classroom_short_name_wf',
             'classroom_name_tc',
