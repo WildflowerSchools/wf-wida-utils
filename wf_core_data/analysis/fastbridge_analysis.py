@@ -1,5 +1,6 @@
 import wf_core_data.utils
 import pandas as pd
+import os
 import logging
 
 logger = logging.getLogger(__name__)
@@ -89,6 +90,19 @@ for test, subtests in ASSESSMENTS.items():
                 })
 FIELD_NAMES = pd.DataFrame(FIELD_NAMES_LIST)
 FIELD_NAMES.set_index(['test', 'field_name'], inplace=True)
+
+def fetch_fastbridge_results_local_file(
+    path
+):
+    if not os.path.exists(path):
+        raise ValueError('File \'{}\' not found'.format(path))
+    if not os.path.isfile(path):
+        raise ValueError('Object at \'{}\' is not a file'.format(path))
+    results = pd.read_csv(
+        path,
+        dtype='object'
+    )
+    return results
 
 def parse_fastbridge_results(
     results,
