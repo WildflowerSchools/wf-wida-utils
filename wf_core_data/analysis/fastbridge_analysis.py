@@ -91,6 +91,36 @@ for test, subtests in ASSESSMENTS.items():
 FIELD_NAMES = pd.DataFrame(FIELD_NAMES_LIST)
 FIELD_NAMES.set_index(['test', 'field_name'], inplace=True)
 
+def fetch_and_parse_fastbridge_results_local_directory(
+    dir_path,
+    rollover_month=7,
+    rollover_day=31
+):
+    if not os.path.exists(dir_path):
+        raise ValueError('Path \'{}\' not found'.format(dir_path))
+    if not os.path.isdir(dir_path):
+        raise ValueError('Object at \'{}\' is not a directory'.format(dir_path))
+    paths = list()
+    for directory_entry in os.listdir(dir_path):
+        file_path = os.path.join(
+            dir_path,
+            directory_entry
+        )
+        if not os.path.isfile(file_path):
+            continue
+        file_extension = os.path.splitext(os.path.normpath(file_path))[1]
+        if file_extension not in ['.csv', '.CSV']:
+            continue
+        paths.append(file_path)
+    if len(paths) == 0:
+        raise ValueError('No CSV files found in directory')
+    parsed_results = fetch_and_parse_fastbridge_results_local_files(
+        paths=paths,
+        rollover_month=rollover_month,
+        rollover_day=rollover_day
+    )
+    return parsed_results
+
 def fetch_and_parse_fastbridge_results_local_files(
     paths,
     rollover_month=7,
