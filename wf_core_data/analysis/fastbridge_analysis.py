@@ -91,6 +91,54 @@ for test, subtests in ASSESSMENTS.items():
 FIELD_NAMES = pd.DataFrame(FIELD_NAMES_LIST)
 FIELD_NAMES.set_index(['test', 'field_name'], inplace=True)
 
+def fetch_and_parse_fastbridge_results_local_files(
+    paths,
+    rollover_month=7,
+    rollover_day=31
+):
+    parsed_results_list=list()
+    for path in paths:
+        results = fetch_fastbridge_results_local_file(
+            path=path
+        )
+        parsed_results = parse_fastbridge_results(
+            results=results,
+            rollover_month=rollover_month,
+            rollover_day=rollover_day
+        )
+        parsed_results_list.append(parsed_results)
+    parsed_results = pd.concat(
+        parsed_results_list,
+        ignore_index=True
+    )
+    parsed_results.sort_values(
+        [
+            'school_year',
+            'term',
+            'test',
+            'subtest',
+            'test_date'
+        ],
+        inplace=True,
+        ignore_index=True
+    )
+    return parsed_results
+
+def fetch_and_parse_fastbridge_results_local_file(
+    path,
+    rollover_month=7,
+    rollover_day=31
+):
+    results = fetch_fastbridge_results_local_file(
+        path=path
+    )
+    parsed_results = parse_fastbridge_results(
+        results=results,
+        rollover_month=rollover_month,
+        rollover_day=rollover_day
+    )
+    return parsed_results
+
 def fetch_fastbridge_results_local_file(
     path
 ):
@@ -177,8 +225,9 @@ def parse_fastbridge_results(
             'term',
             'test',
             'subtest',
-            'fast_id'
+            'test_date'
         ],
-        inplace=True
+        inplace=True,
+        ignore_index=True
     )
     return parsed_results
