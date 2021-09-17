@@ -55,3 +55,19 @@ def extract_alphanumeric(object):
         return None
     alphanumeric_string = ''.join(ch for ch in object_string if ch.isalnum())
     return alphanumeric_string
+
+def infer_school_year(
+    date,
+    rollover_month=7,
+    rollover_day=31
+):
+    if date.month <= rollover_month and date.day <= rollover_day:
+        return '{}-{}'.format(
+            date.year - 1,
+            date.year
+        )
+    else:
+        return '{}-{}'.format(
+            date.year,
+            date.year + 1
+        )

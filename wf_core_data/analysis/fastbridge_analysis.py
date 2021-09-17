@@ -91,7 +91,9 @@ FIELD_NAMES = pd.DataFrame(FIELD_NAMES_LIST)
 FIELD_NAMES.set_index(['test', 'field_name'], inplace=True)
 
 def parse_fastbridge_results(
-    results
+    results,
+    rollover_month=7,
+    rollover_day=31
 ):
     parsed_results = (
         pd.melt(
@@ -139,8 +141,29 @@ def parse_fastbridge_results(
             'Percentile at Nation': 'percentile',
             'Risk Level': 'risk_level'
         })
-        .sort_index()
+        .reset_index()
     )
     parsed_results['test_date'] = parsed_results['test_date'].apply(wf_core_data.utils.to_date)
     parsed_results['percentile'] = pd.to_numeric(parsed_results['percentile']).astype('float')
+    parsed_results['school_year'] = parsed_results['test_date'].apply(wf_core_data.utils.infer_school_year)
+    parsed_results = parsed_results.reindex(columns=[
+        'school_year',
+        'term',
+        'test',
+        'subtest',
+        'fast_id',
+        'test_date',
+        'percentile',
+        'risk_level'
+    ])
+    parsed_results.sort_values(
+        [
+            'school_year',
+            'term',
+            'test',
+            'subtest',
+            'fast_id'
+        ],
+        inplace=True
+    )
     return parsed_results
