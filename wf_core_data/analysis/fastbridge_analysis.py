@@ -157,6 +157,7 @@ def parse_fastbridge_results(
         })
         .reset_index()
     )
+    parsed_results.columns.name = None
     parsed_results['test_date'] = parsed_results['test_date'].apply(wf_core_data.utils.to_date)
     parsed_results['percentile'] = pd.to_numeric(parsed_results['percentile']).astype('float')
     parsed_results['school_year'] = parsed_results['test_date'].apply(wf_core_data.utils.infer_school_year)
