@@ -1,18 +1,20 @@
 import wf_core_data.utils
 import pandas as pd
+import collections
+import itertools
 import os
 import logging
 
 logger = logging.getLogger(__name__)
 
-TERMS = [
+TERMS = (
     'Fall',
     'Winter',
     'Spring'
-]
+)
 
-ASSESSMENTS = {
-    'Early Reading English': [
+ASSESSMENTS = collections.OrderedDict((
+    ('Early Reading English', (
         'Early Reading English',
         'Concepts of Print',
         'Decodable Words',
@@ -27,8 +29,8 @@ ASSESSMENTS = {
         'Word Blending',
         'Word Segmenting',
         'CBMR-English'
-    ],
-    'Early Reading Spanish': [
+    )),
+    ('Early Reading Spanish', (
         'Early Reading Spanish',
         'Concepts of Print Spanish',
         'Decodable Words Spanish',
@@ -43,8 +45,8 @@ ASSESSMENTS = {
         'Word Blending Spanish',
         'Word Segmenting Spanish',
         'CBMR-Spanish'
-    ],
-    'Early Math': [
+    )),
+    ('Early Math', (
         'Early Math',
         'Composing',
         'Counting Objects',
@@ -63,14 +65,20 @@ ASSESSMENTS = {
         'Verbal Addition',
         'Verbal Subtraction',
         'Story Problems'
-    ]
-}
+    ))
+))
 
-METRICS = [
+METRICS = (
     'Risk Level',
     'Percentile at Nation',
     'Final Date'
-]
+)
+
+RISK_LEVELS=(
+    'highRisk',
+    'someRisk',
+    'lowRisk'
+)
 
 FIELD_NAMES_LIST = list()
 for test, subtests in ASSESSMENTS.items():
@@ -236,8 +244,28 @@ def parse_fastbridge_results(
         .reset_index()
     )
     parsed_results.columns.name = None
+    parsed_results['term'] = pd.Categorical(
+        parsed_results['term'],
+        categories=TERMS,
+        ordered=True
+    )
+    parsed_results['test'] = pd.Categorical(
+        parsed_results['test'],
+        categories=ASSESSMENTS.keys(),
+        ordered=True
+    )
+    parsed_results['subtest'] = pd.Categorical(
+        parsed_results['subtest'],
+        categories=itertools.chain(*ASSESSMENTS.values()),
+        ordered=True
+    )
     parsed_results['test_date'] = parsed_results['test_date'].apply(wf_core_data.utils.to_date)
     parsed_results['percentile'] = pd.to_numeric(parsed_results['percentile']).astype('float')
+    parsed_results['risk_level'] = pd.Categorical(
+        parsed_results['risk_level'],
+        categories=RISK_LEVELS,
+        ordered=True
+    )
     parsed_results['school_year'] = parsed_results['test_date'].apply(wf_core_data.utils.infer_school_year)
     parsed_results = parsed_results.reindex(columns=[
         'school_year',
