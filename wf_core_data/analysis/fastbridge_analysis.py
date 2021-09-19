@@ -306,7 +306,11 @@ def summarize_by_student_test(
             starting_percentile=('percentile', lambda x: x.iloc[0]),
             ending_percentile=('percentile', lambda x: x.iloc[-1]),
         )
+        .dropna(how='all')
     )
+    students_tests['met_attainment_goal'] = (students_tests['ending_risk_level'] == 'lowRisk')
+    students_tests['met_growth_goal'] = (students_tests['starting_risk_level'] == 'highRisk') & (students_tests['ending_risk_level'] != 'highRisk')
+    students_tests['met_goal'] = students_tests['met_attainment_goal'] | students_tests['met_growth_goal']
     students_tests['percentile_growth'] = np.subtract(
         students_tests['ending_percentile'],
         students_tests['starting_percentile']
@@ -325,4 +329,18 @@ def summarize_by_student_test(
             axis=1
         )
     )
+    students_tests = students_tests.reindex(columns=[
+        'starting_date',
+        'ending_date',
+        'starting_risk_level',
+        'ending_risk_level',
+        'met_growth_goal',
+        'met_attainment_goal',
+        'met_goal',
+        'starting_percentile',
+        'ending_percentile',
+        'percentile_growth',
+        'num_days',
+        'percentile_growth_per_year'
+    ])
     return students_tests
