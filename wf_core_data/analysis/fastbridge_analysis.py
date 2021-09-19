@@ -99,7 +99,7 @@ for test, subtests in ASSESSMENTS.items():
 FIELD_NAMES = pd.DataFrame(FIELD_NAMES_LIST)
 FIELD_NAMES.set_index(['test', 'field_name'], inplace=True)
 
-def fetch_and_parse_fastbridge_results_local_directory(
+def fetch_fastbridge_results_local_directory_and_extract_test_events(
     dir_path,
     rollover_month=7,
     rollover_day=31
@@ -122,14 +122,14 @@ def fetch_and_parse_fastbridge_results_local_directory(
         paths.append(file_path)
     if len(paths) == 0:
         raise ValueError('No CSV files found in directory')
-    parsed_results = fetch_and_parse_fastbridge_results_local_files(
+    test_events = fetch_fastbridge_results_local_files_and_extract_test_events(
         paths=paths,
         rollover_month=rollover_month,
         rollover_day=rollover_day
     )
-    return parsed_results
+    return test_events
 
-def fetch_and_parse_fastbridge_results_local_files(
+def fetch_fastbridge_results_local_files_and_extract_test_events(
     paths,
     rollover_month=7,
     rollover_day=31
@@ -139,17 +139,17 @@ def fetch_and_parse_fastbridge_results_local_files(
         results = fetch_fastbridge_results_local_file(
             path=path
         )
-        parsed_results = parse_fastbridge_results(
+        test_events = extract_test_events(
             results=results,
             rollover_month=rollover_month,
             rollover_day=rollover_day
         )
-        parsed_results_list.append(parsed_results)
-    parsed_results = pd.concat(
+        parsed_results_list.append(test_events)
+    test_events = pd.concat(
         parsed_results_list,
         ignore_index=True
     )
-    parsed_results.sort_values(
+    test_events.sort_values(
         [
             'school_year',
             'term',
@@ -160,9 +160,9 @@ def fetch_and_parse_fastbridge_results_local_files(
         inplace=True,
         ignore_index=True
     )
-    return parsed_results
+    return test_events
 
-def fetch_and_parse_fastbridge_results_local_file(
+def fetch_fastbridge_results_local_file_and_extract_test_events(
     path,
     rollover_month=7,
     rollover_day=31
@@ -170,12 +170,12 @@ def fetch_and_parse_fastbridge_results_local_file(
     results = fetch_fastbridge_results_local_file(
         path=path
     )
-    parsed_results = parse_fastbridge_results(
+    test_events = extract_test_events(
         results=results,
         rollover_month=rollover_month,
         rollover_day=rollover_day
     )
-    return parsed_results
+    return test_events
 
 def fetch_fastbridge_results_local_file(
     path
@@ -190,12 +190,12 @@ def fetch_fastbridge_results_local_file(
     )
     return results
 
-def parse_fastbridge_results(
+def extract_test_events(
     results,
     rollover_month=7,
     rollover_day=31
 ):
-    parsed_results = (
+    test_events = (
         pd.melt(
             results,
             id_vars=['Assessment', 'FAST ID'],
@@ -243,31 +243,31 @@ def parse_fastbridge_results(
         })
         .reset_index()
     )
-    parsed_results.columns.name = None
-    parsed_results['term'] = pd.Categorical(
-        parsed_results['term'],
+    test_events.columns.name = None
+    test_events['term'] = pd.Categorical(
+        test_events['term'],
         categories=TERMS,
         ordered=True
     )
-    parsed_results['test'] = pd.Categorical(
-        parsed_results['test'],
+    test_events['test'] = pd.Categorical(
+        test_events['test'],
         categories=ASSESSMENTS.keys(),
         ordered=True
     )
-    parsed_results['subtest'] = pd.Categorical(
-        parsed_results['subtest'],
+    test_events['subtest'] = pd.Categorical(
+        test_events['subtest'],
         categories=itertools.chain(*ASSESSMENTS.values()),
         ordered=True
     )
-    parsed_results['test_date'] = parsed_results['test_date'].apply(wf_core_data.utils.to_date)
-    parsed_results['percentile'] = pd.to_numeric(parsed_results['percentile']).astype('float')
-    parsed_results['risk_level'] = pd.Categorical(
-        parsed_results['risk_level'],
+    test_events['test_date'] = test_events['test_date'].apply(wf_core_data.utils.to_date)
+    test_events['percentile'] = pd.to_numeric(test_events['percentile']).astype('float')
+    test_events['risk_level'] = pd.Categorical(
+        test_events['risk_level'],
         categories=RISK_LEVELS,
         ordered=True
     )
-    parsed_results['school_year'] = parsed_results['test_date'].apply(wf_core_data.utils.infer_school_year)
-    parsed_results = parsed_results.reindex(columns=[
+    test_events['school_year'] = test_events['test_date'].apply(wf_core_data.utils.infer_school_year)
+    test_events = test_events.reindex(columns=[
         'school_year',
         'term',
         'test',
@@ -277,7 +277,7 @@ def parse_fastbridge_results(
         'percentile',
         'risk_level'
     ])
-    parsed_results.sort_values(
+    test_events.sort_values(
         [
             'school_year',
             'term',
@@ -288,4 +288,4 @@ def parse_fastbridge_results(
         inplace=True,
         ignore_index=True
     )
-    return parsed_results
+    return test_events
