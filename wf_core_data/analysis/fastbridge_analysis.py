@@ -297,7 +297,7 @@ def summarize_by_student_test(
     students_tests = (
         test_events
         .sort_values('test_date')
-        .groupby(['test', 'subtest', 'fast_id'])
+        .groupby(['school_year', 'test', 'subtest', 'fast_id'])
         .agg(
             starting_date=('test_date', lambda x: x.iloc[0]),
             ending_date=('test_date', lambda x: x.iloc[-1]),
