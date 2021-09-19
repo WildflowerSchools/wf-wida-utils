@@ -1,5 +1,6 @@
 import wf_core_data.utils
 import pandas as pd
+import numpy as np
 import collections
 import itertools
 import os
@@ -289,3 +290,39 @@ def extract_test_events(
         ignore_index=True
     )
     return test_events
+
+def summarize_by_student_test(
+    test_events
+):
+    students_tests = (
+        test_events
+        .sort_values('test_date')
+        .groupby(['test', 'subtest', 'fast_id'])
+        .agg(
+            starting_date=('test_date', lambda x: x.iloc[0]),
+            ending_date=('test_date', lambda x: x.iloc[-1]),
+            starting_risk_level=('risk_level', lambda x: x.iloc[0]),
+            ending_risk_level=('risk_level', lambda x: x.iloc[-1]),
+            starting_percentile=('percentile', lambda x: x.iloc[0]),
+            ending_percentile=('percentile', lambda x: x.iloc[-1]),
+        )
+    )
+    students_tests['percentile_growth'] = np.subtract(
+        students_tests['ending_percentile'],
+        students_tests['starting_percentile']
+    )
+    students_tests['num_days'] = (
+        np.subtract(
+            students_tests['ending_date'],
+            students_tests['starting_date']
+        )
+        .apply(lambda x: x.days)
+    )
+    students_tests['percentile_growth_per_year'] = (
+        students_tests
+        .apply(
+            lambda row: row['percentile_growth']/(row['num_days']/365.25) if not pd.isna(row['percentile_growth']) and row['num_days'] > 0 else np.nan,
+            axis=1
+        )
+    )
+    return students_tests
