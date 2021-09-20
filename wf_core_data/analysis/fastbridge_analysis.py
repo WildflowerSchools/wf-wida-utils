@@ -100,6 +100,13 @@ for test, subtests in ASSESSMENTS.items():
 FIELD_NAMES = pd.DataFrame(FIELD_NAMES_LIST)
 FIELD_NAMES.set_index(['test', 'field_name'], inplace=True)
 
+TEMP = FIELD_NAMES.reset_index()
+TEST_DATE_FIELD_NAMES = (
+    TEMP
+    .loc[TEMP['metric'] == 'Final Date', 'field_name']
+    .tolist()
+)
+
 def fetch_fastbridge_results_local_directory_and_extract_test_events(
     dir_path,
     rollover_month=7,
@@ -293,7 +300,9 @@ def extract_test_events(
 
 def extract_student_info(
     results,
-    school_year
+    school_year=None,
+    rollover_month=7,
+    rollover_day=31
 ):
     student_info = (
         results
@@ -310,8 +319,14 @@ def extract_student_info(
             'Grade': 'grade'
         })
     )
-    student_info['school_year'] = school_year
     student_info['birth_date'] = student_info['birth_date'].apply(wf_core_data.utils.to_date)
+    if school_year is None:
+        school_year = infer_school_year_from_results(
+            results,
+            rollover_month=rollover_month,
+            rollover_day=rollover_day
+        )
+    student_info['school_year'] = school_year
     student_info.set_index(
         ['fast_id', 'school_year'],
         inplace=True
@@ -382,3 +397,36 @@ def summarize_by_student_test(
         'percentile_growth_per_year'
     ])
     return students_tests
+
+def infer_school_year_from_results(
+    results,
+    rollover_month=7,
+    rollover_day=31
+):
+    school_years = list()
+    for field_name in TEST_DATE_FIELD_NAMES:
+        if field_name not in results.columns:
+            continue
+        school_years_subtest = (
+            results[field_name]
+            .apply(lambda x: wf_core_data.utils.infer_school_year(
+                wf_core_data.utils.to_date(x),
+                rollover_month=rollover_month,
+                rollover_day=rollover_day
+            ))
+            .dropna()
+            .unique()
+            .tolist()
+        )
+        # print(school_years_subtest)
+        school_years.extend(school_years_subtest)
+    # print(school_years)
+    school_years = np.unique(school_years).tolist()
+    # print(school_years)
+    if len(school_years) == 0:
+        raise ValueError('No parseable test dates found')
+    if len(school_years) > 1:
+        raise ValueError('Data contains multiple school years')
+    school_year = school_years[0]
+    # print(school_year)
+    return school_year

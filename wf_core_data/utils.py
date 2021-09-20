@@ -61,6 +61,8 @@ def infer_school_year(
     rollover_month=7,
     rollover_day=31
 ):
+    if pd.isna(date):
+        return None
     if date.month <= rollover_month and date.day <= rollover_day:
         return '{}-{}'.format(
             date.year - 1,
