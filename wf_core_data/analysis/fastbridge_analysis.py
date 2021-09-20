@@ -291,6 +291,44 @@ def extract_test_events(
     )
     return test_events
 
+def extract_student_info(
+    results,
+    school_year
+):
+    student_info = (
+        results
+        .rename(columns= {
+            'FAST ID': 'fast_id',
+            'Local ID': 'local_id',
+            'State ID': 'state_id',
+            'First Name': 'first_name',
+            'Last Name': 'last_name',
+            'Gender': 'gender',
+            'DOB': 'birth_date',
+            'Race': 'race',
+            'School': 'school',
+            'Grade': 'grade'
+        })
+    )
+    student_info['school_year'] = school_year
+    student_info['birth_date'] = student_info['birth_date'].apply(wf_core_data.utils.to_date)
+    student_info.set_index(
+        ['fast_id', 'school_year'],
+        inplace=True
+    )
+    student_info = student_info.reindex(columns=[
+        'local_id',
+        'state_id',
+        'first_name',
+        'last_name',
+        'gender',
+        'birth_date',
+        'race',
+        'school',
+        'grade'
+    ])
+    return student_info
+
 def summarize_by_student_test(
     test_events
 ):
