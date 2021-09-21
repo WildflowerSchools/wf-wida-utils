@@ -163,23 +163,23 @@ def fetch_and_parse_fastbridge_results_local_files(
         test_events_list.append(test_events_file)
         student_info_list.append(student_info_file)
     test_events = pd.concat(
-        test_events_list,
-        ignore_index=True
+        test_events_list
     )
     student_info = pd.concat(
         student_info_list
     )
-    test_events.sort_values(
-        [
-            'school_year',
-            'term',
-            'test',
-            'subtest',
-            'test_date'
-        ],
-        inplace=True,
-        ignore_index=True
-    )
+    # test_events.sort_values(
+    #     [
+    #         'school_year',
+    #         'term',
+    #         'test',
+    #         'subtest',
+    #         'test_date'
+    #     ],
+    #     inplace=True,
+    #     ignore_index=True
+    # )
+    test_events.sort_index(inplace=True)
     student_info = (
         student_info
         .reset_index()
@@ -209,17 +209,18 @@ def fetch_fastbridge_results_local_file_and_extract_test_events(
     student_info = extract_student_info(
         results=results
     )
-    test_events.sort_values(
-        [
-            'school_year',
-            'term',
-            'test',
-            'subtest',
-            'test_date'
-        ],
-        inplace=True,
-        ignore_index=True
-    )
+    # test_events.sort_values(
+    #     [
+    #         'school_year',
+    #         'term',
+    #         'test',
+    #         'subtest',
+    #         'test_date'
+    #     ],
+    #     inplace=True,
+    #     ignore_index=True
+    # )
+    test_events.sort_index(inplace=True)
     student_info = (
         student_info
         .reset_index()
@@ -351,6 +352,16 @@ def extract_test_events(
         inplace=True,
         ignore_index=True
     )
+    test_events.set_index(
+        [
+                'school_year',
+                'term',
+                'test',
+                'subtest',
+                'fast_id'
+        ],
+        inplace=True
+    )
     return test_events
 
 def extract_student_info(
@@ -394,6 +405,7 @@ def summarize_by_student_test(
 ):
     students_tests = (
         test_events
+        .reset_index()
         .sort_values('test_date')
         .groupby(['school_year', 'test', 'subtest', 'fast_id'])
         .agg(
