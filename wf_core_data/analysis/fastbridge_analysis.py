@@ -107,10 +107,13 @@ TEST_DATE_FIELD_NAMES = (
     .tolist()
 )
 
+DEFAULT_ROLLOVER_MONTH = 7
+DEFAULT_ROLLOVER_DAY = 31
+
 def fetch_fastbridge_results_local_directory_and_extract_test_events(
     dir_path,
-    rollover_month=7,
-    rollover_day=31
+    rollover_month=DEFAULT_ROLLOVER_MONTH,
+    rollover_day=DEFAULT_ROLLOVER_DAY
 ):
     if not os.path.exists(dir_path):
         raise ValueError('Path \'{}\' not found'.format(dir_path))
@@ -139,18 +142,19 @@ def fetch_fastbridge_results_local_directory_and_extract_test_events(
 
 def fetch_fastbridge_results_local_files_and_extract_test_events(
     paths,
-    rollover_month=7,
-    rollover_day=31
+    rollover_month=DEFAULT_ROLLOVER_MONTH,
+    rollover_day=DEFAULT_ROLLOVER_DAY
 ):
     parsed_results_list=list()
     for path in paths:
         results = fetch_fastbridge_results_local_file(
-            path=path
-        )
-        test_events = extract_test_events(
-            results=results,
+            path=path,
+            school_year=None,
             rollover_month=rollover_month,
             rollover_day=rollover_day
+        )
+        test_events = extract_test_events(
+            results=results
         )
         parsed_results_list.append(test_events)
     test_events = pd.concat(
@@ -172,21 +176,26 @@ def fetch_fastbridge_results_local_files_and_extract_test_events(
 
 def fetch_fastbridge_results_local_file_and_extract_test_events(
     path,
-    rollover_month=7,
-    rollover_day=31
+    school_year=None,
+    rollover_month=DEFAULT_ROLLOVER_MONTH,
+    rollover_day=DEFAULT_ROLLOVER_DAY
 ):
     results = fetch_fastbridge_results_local_file(
-        path=path
-    )
-    test_events = extract_test_events(
-        results=results,
+        path=path,
+        school_year=school_year,
         rollover_month=rollover_month,
         rollover_day=rollover_day
+    )
+    test_events = extract_test_events(
+        results=results
     )
     return test_events
 
 def fetch_fastbridge_results_local_file(
-    path
+    path,
+    school_year=None,
+    rollover_month=DEFAULT_ROLLOVER_MONTH,
+    rollover_day=DEFAULT_ROLLOVER_DAY
 ):
     if not os.path.exists(path):
         raise ValueError('File \'{}\' not found'.format(path))
@@ -196,17 +205,22 @@ def fetch_fastbridge_results_local_file(
         path,
         dtype='object'
     )
+    if school_year is None:
+        school_year=infer_school_year_from_results(
+            results,
+            rollover_month=rollover_month,
+            rollover_day=rollover_day
+        )
+    results.insert(0, 'school_year', school_year)
     return results
 
 def extract_test_events(
-    results,
-    rollover_month=7,
-    rollover_day=31
+    results
 ):
     test_events = (
         pd.melt(
             results,
-            id_vars=['Assessment', 'FAST ID'],
+            id_vars=['school_year', 'Assessment', 'FAST ID'],
             value_vars=set(FIELD_NAMES.index.get_level_values('field_name')).intersection(results.columns),
             var_name='field_name',
             value_name='value'
@@ -222,6 +236,7 @@ def extract_test_events(
             on=['test', 'field_name']
         )
         .reindex(columns=[
+            'school_year',
             'term',
             'test',
             'subtest',
@@ -231,6 +246,7 @@ def extract_test_events(
         ])
         .pivot(
             index=[
+                'school_year',
                 'term',
                 'test',
                 'subtest',
@@ -274,7 +290,6 @@ def extract_test_events(
         categories=RISK_LEVELS,
         ordered=True
     )
-    test_events['school_year'] = test_events['test_date'].apply(wf_core_data.utils.infer_school_year)
     test_events = test_events.reindex(columns=[
         'school_year',
         'term',
@@ -299,10 +314,7 @@ def extract_test_events(
     return test_events
 
 def extract_student_info(
-    results,
-    school_year=None,
-    rollover_month=7,
-    rollover_day=31
+    results
 ):
     student_info = (
         results
@@ -320,13 +332,6 @@ def extract_student_info(
         })
     )
     student_info['birth_date'] = student_info['birth_date'].apply(wf_core_data.utils.to_date)
-    if school_year is None:
-        school_year = infer_school_year_from_results(
-            results,
-            rollover_month=rollover_month,
-            rollover_day=rollover_day
-        )
-    student_info['school_year'] = school_year
     student_info.set_index(
         ['fast_id', 'school_year'],
         inplace=True
@@ -400,8 +405,8 @@ def summarize_by_student_test(
 
 def infer_school_year_from_results(
     results,
-    rollover_month=7,
-    rollover_day=31
+    rollover_month=DEFAULT_ROLLOVER_MONTH,
+    rollover_day=DEFAULT_ROLLOVER_DAY
 ):
     school_years = list()
     for field_name in TEST_DATE_FIELD_NAMES:
