@@ -168,17 +168,6 @@ def fetch_and_parse_fastbridge_results_local_files(
     student_info = pd.concat(
         student_info_list
     )
-    # test_events.sort_values(
-    #     [
-    #         'school_year',
-    #         'term',
-    #         'test',
-    #         'subtest',
-    #         'test_date'
-    #     ],
-    #     inplace=True,
-    #     ignore_index=True
-    # )
     test_events.sort_index(inplace=True)
     student_info = (
         student_info
@@ -209,17 +198,6 @@ def fetch_fastbridge_results_local_file_and_extract_test_events(
     student_info = extract_student_info(
         results=results
     )
-    # test_events.sort_values(
-    #     [
-    #         'school_year',
-    #         'term',
-    #         'test',
-    #         'subtest',
-    #         'test_date'
-    #     ],
-    #     inplace=True,
-    #     ignore_index=True
-    # )
     test_events.sort_index(inplace=True)
     student_info = (
         student_info
