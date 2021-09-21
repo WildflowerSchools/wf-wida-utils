@@ -379,7 +379,8 @@ def extract_student_info(
     return student_info
 
 def summarize_by_student_test(
-    test_events
+    test_events,
+    student_info
 ):
     students_tests = (
         test_events
@@ -417,7 +418,21 @@ def summarize_by_student_test(
             axis=1
         )
     )
+    students_tests = students_tests.join(
+        student_info,
+        how='left',
+        on=['fast_id', 'school_year']
+    )
     students_tests = students_tests.reindex(columns=[
+        'local_id',
+        'state_id',
+        'first_name',
+        'last_name',
+        'gender',
+        'birth_date',
+        'race',
+        'school',
+        'grade',
         'starting_date',
         'ending_date',
         'starting_risk_level',
