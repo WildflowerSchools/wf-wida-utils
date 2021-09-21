@@ -483,15 +483,15 @@ def summarize_by_student_group(
         .dropna(how='all')
     )
     student_groups = student_groups.loc[student_groups['num_valid_test_results'] > 0].copy()
-    student_groups['percent_met_growth_goal'] = 100*student_groups['num_met_growth_goal'].astype('float')/student_groups['num_valid_goal_info'].astype('float')
-    student_groups['percent_met_attainment_goal'] = 100*student_groups['num_met_attainment_goal'].astype('float')/student_groups['num_valid_goal_info'].astype('float')
-    student_groups['percent_met_goal'] = 100*student_groups['num_met_goal'].astype('float')/student_groups['num_valid_goal_info'].astype('float')
+    student_groups['frac_met_growth_goal'] = student_groups['num_met_growth_goal'].astype('float')/student_groups['num_valid_goal_info'].astype('float')
+    student_groups['frac_met_attainment_goal'] = student_groups['num_met_attainment_goal'].astype('float')/student_groups['num_valid_goal_info'].astype('float')
+    student_groups['frac_met_goal'] = student_groups['num_met_goal'].astype('float')/student_groups['num_valid_goal_info'].astype('float')
     student_groups = student_groups.reindex(columns=[
         'num_valid_test_results',
         'num_valid_goal_info',
-        'percent_met_growth_goal',
-        'percent_met_attainment_goal',
-        'percent_met_goal',
+        'frac_met_growth_goal',
+        'frac_met_attainment_goal',
+        'frac_met_goal',
         'num_valid_percentile_growth',
         'mean_percentile_growth',
         'num_valid_percentile_growth_per_year',
