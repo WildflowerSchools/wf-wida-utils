@@ -400,10 +400,18 @@ def summarize_by_student_test(
     students_tests['met_attainment_goal'] = (students_tests['ending_risk_level'] == 'lowRisk')
     students_tests['met_growth_goal'] = (students_tests['starting_risk_level'] == 'highRisk') & (students_tests['ending_risk_level'] != 'highRisk')
     students_tests['met_goal'] = students_tests['met_attainment_goal'] | students_tests['met_growth_goal']
+    students_tests['num_days'] = (
+        np.subtract(
+            students_tests['ending_date'],
+            students_tests['starting_date']
+        )
+        .apply(lambda x: x.days)
+    )
     students_tests['percentile_growth'] = np.subtract(
         students_tests['ending_percentile'],
         students_tests['starting_percentile']
     )
+    students_tests.loc[students_tests['num_days'] == 0, 'percentile_growth'] = np.nan
     students_tests['num_days'] = (
         np.subtract(
             students_tests['ending_date'],
@@ -442,11 +450,54 @@ def summarize_by_student_test(
         'met_goal',
         'starting_percentile',
         'ending_percentile',
-        'percentile_growth',
         'num_days',
+        'percentile_growth',
         'percentile_growth_per_year'
     ])
     return students_tests
+
+def summarize_by_student_group(
+    students_tests,
+    grouping_variables=[
+        'school_year',
+        'school',
+        'test',
+        'subtest'
+    ]
+):
+    student_groups = (
+        students_tests
+        .reset_index()
+        .groupby(grouping_variables)
+        .agg(
+            num_valid_test_results=('fast_id', 'count'),
+            num_valid_goal_info=('met_goal', 'count'),
+            num_met_growth_goal=('met_growth_goal', 'sum'),
+            num_met_attainment_goal=('met_attainment_goal', 'sum'),
+            num_met_goal=('met_goal', 'sum'),
+            num_valid_percentile_growth=('percentile_growth', 'count'),
+            mean_percentile_growth=('percentile_growth', 'mean'),
+            num_valid_percentile_growth_per_year=('percentile_growth_per_year', 'count'),
+            mean_percentile_growth_per_year=('percentile_growth_per_year', 'mean')
+        )
+        .dropna(how='all')
+    )
+    student_groups = student_groups.loc[student_groups['num_valid_test_results'] > 0].copy()
+    student_groups['percent_met_growth_goal'] = 100*student_groups['num_met_growth_goal'].astype('float')/student_groups['num_valid_goal_info'].astype('float')
+    student_groups['percent_met_attainment_goal'] = 100*student_groups['num_met_attainment_goal'].astype('float')/student_groups['num_valid_goal_info'].astype('float')
+    student_groups['percent_met_goal'] = 100*student_groups['num_met_goal'].astype('float')/student_groups['num_valid_goal_info'].astype('float')
+    student_groups = student_groups.reindex(columns=[
+        'num_valid_test_results',
+        'num_valid_goal_info',
+        'percent_met_growth_goal',
+        'percent_met_attainment_goal',
+        'percent_met_goal',
+        'num_valid_percentile_growth',
+        'mean_percentile_growth',
+        'num_valid_percentile_growth_per_year',
+        'mean_percentile_growth_per_year'
+    ])
+    return student_groups
 
 def infer_school_year_from_results(
     results,
