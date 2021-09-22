@@ -378,14 +378,24 @@ def extract_student_info(
     ])
     return student_info
 
-def summarize_by_student_test(
+def summarize_by_student_test_school_year(
     test_events,
     student_info
 ):
     students_tests = (
         test_events
         .reset_index()
-        .sort_values('test_date')
+        .pivot(
+            index=['school_year', 'test', 'subtest', 'fast_id'],
+            columns = 'term',
+            values=['test_date', 'percentile', 'risk_level']
+        )
+    )
+    students_tests.columns = ['{}_{}'.format(x[0], x[1].lower()) for x in students_tests.columns]
+    growth = (
+        test_events
+        .reorder_levels(['school_year', 'test', 'subtest', 'fast_id', 'term'])
+        .sort_index()
         .groupby(['school_year', 'test', 'subtest', 'fast_id'])
         .agg(
             starting_date=('test_date', lambda x: x.iloc[0]),
@@ -395,7 +405,10 @@ def summarize_by_student_test(
             starting_percentile=('percentile', lambda x: x.iloc[0]),
             ending_percentile=('percentile', lambda x: x.iloc[-1]),
         )
-        .dropna(how='all')
+    )
+    students_tests = students_tests.join(
+        growth,
+        how='left'
     )
     students_tests['met_attainment_goal'] = (students_tests['ending_risk_level'] == 'lowRisk')
     students_tests['met_growth_goal'] = (students_tests['starting_risk_level'] == 'highRisk') & (students_tests['ending_risk_level'] != 'highRisk')
@@ -412,13 +425,6 @@ def summarize_by_student_test(
         students_tests['starting_percentile']
     )
     students_tests.loc[students_tests['num_days'] == 0, 'percentile_growth'] = np.nan
-    students_tests['num_days'] = (
-        np.subtract(
-            students_tests['ending_date'],
-            students_tests['starting_date']
-        )
-        .apply(lambda x: x.days)
-    )
     students_tests['percentile_growth_per_year'] = (
         students_tests
         .apply(
@@ -441,16 +447,18 @@ def summarize_by_student_test(
         'race',
         'school',
         'grade',
-        'starting_date',
-        'ending_date',
-        'starting_risk_level',
-        'ending_risk_level',
+        'test_date_fall',
+        'test_date_winter',
+        'test_date_spring',
+        'percentile_fall',
+        'percentile_winter',
+        'percentile_spring',
+        'risk_level_fall',
+        'risk_level_winter',
+        'risk_level_spring',
         'met_growth_goal',
         'met_attainment_goal',
         'met_goal',
-        'starting_percentile',
-        'ending_percentile',
-        'num_days',
         'percentile_growth',
         'percentile_growth_per_year'
     ])
