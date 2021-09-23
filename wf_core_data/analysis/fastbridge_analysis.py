@@ -388,27 +388,44 @@ def summarize_by_student_test_school_year(
         .pivot(
             index=['school_year', 'test', 'subtest', 'fast_id'],
             columns = 'term',
-            values=['test_date', 'percentile', 'risk_level']
+            values=['test_date', 'risk_level', 'percentile']
         )
     )
     students_tests.columns = ['{}_{}'.format(x[0], x[1].lower()) for x in students_tests.columns]
-    growth = (
+    goals = (
         test_events
+        .dropna(subset=['risk_level'])
         .reorder_levels(['school_year', 'test', 'subtest', 'fast_id', 'term'])
         .sort_index()
         .groupby(['school_year', 'test', 'subtest', 'fast_id'])
         .agg(
-            starting_date=('test_date', lambda x: x.iloc[0]),
-            ending_date=('test_date', lambda x: x.iloc[-1]),
-            starting_risk_level=('risk_level', lambda x: x.iloc[0]),
-            ending_risk_level=('risk_level', lambda x: x.iloc[-1]),
-            starting_percentile=('percentile', lambda x: x.iloc[0]),
-            ending_percentile=('percentile', lambda x: x.iloc[-1]),
+            starting_risk_level=('risk_level', lambda x: x.dropna().iloc[0]),
+            ending_risk_level=('risk_level', lambda x: x.dropna().iloc[-1]),
         )
     )
-    students_tests = students_tests.join(
-        growth,
-        how='left'
+    percentiles = (
+        test_events
+        .dropna(subset=['percentile'])
+        .reorder_levels(['school_year', 'test', 'subtest', 'fast_id', 'term'])
+        .sort_index()
+        .groupby(['school_year', 'test', 'subtest', 'fast_id'])
+        .agg(
+            starting_date=('test_date', lambda x: x.dropna().iloc[0]),
+            ending_date=('test_date', lambda x: x.dropna().iloc[-1]),
+            starting_percentile=('percentile', lambda x: x.dropna().iloc[0]),
+            ending_percentile=('percentile', lambda x: x.dropna().iloc[-1]),
+        )
+    )
+    students_tests = (
+    students_tests
+        .join(
+            goals,
+            how='left'
+        )
+        .join(
+            percentiles,
+            how='left'
+        )
     )
     students_tests['met_attainment_goal'] = (students_tests['ending_risk_level'] == 'lowRisk')
     students_tests['met_growth_goal'] = (students_tests['starting_risk_level'] == 'highRisk') & (students_tests['ending_risk_level'] != 'highRisk')
@@ -450,15 +467,15 @@ def summarize_by_student_test_school_year(
         'test_date_fall',
         'test_date_winter',
         'test_date_spring',
-        'percentile_fall',
-        'percentile_winter',
-        'percentile_spring',
         'risk_level_fall',
         'risk_level_winter',
         'risk_level_spring',
         'met_growth_goal',
         'met_attainment_goal',
         'met_goal',
+        'percentile_fall',
+        'percentile_winter',
+        'percentile_spring',
         'percentile_growth',
         'percentile_growth_per_year'
     ])
