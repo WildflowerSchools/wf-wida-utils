@@ -7,4 +7,5 @@ from .rosters.fastbridge_roster import *
 from .rosters.fountas_pinnell_roster import *
 from .rosters.mefs_roster import *
 from .rosters.wida_roster import *
+from .analysis.fastbridge_analysis import *
 from .utils import *
