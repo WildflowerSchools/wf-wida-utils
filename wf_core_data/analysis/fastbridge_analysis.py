@@ -378,11 +378,13 @@ def extract_student_info(
     ])
     return student_info
 
-def summarize_by_student_test_school_year(
+def summarize_by_student(
     test_events,
-    student_info
+    student_info,
+    filter_dict=None,
+    select_dict=None
 ):
-    students_tests = (
+    students = (
         test_events
         .reset_index()
         .pivot(
@@ -391,7 +393,7 @@ def summarize_by_student_test_school_year(
             values=['test_date', 'risk_level', 'percentile']
         )
     )
-    students_tests.columns = ['{}_{}'.format(x[0], x[1].lower()) for x in students_tests.columns]
+    students.columns = ['{}_{}'.format(x[0], x[1].lower()) for x in students.columns]
     goals = (
         test_events
         .dropna(subset=['risk_level'])
@@ -416,8 +418,8 @@ def summarize_by_student_test_school_year(
             ending_percentile=('percentile', lambda x: x.dropna().iloc[-1]),
         )
     )
-    students_tests = (
-    students_tests
+    students = (
+    students
         .join(
             goals,
             how='left'
@@ -427,34 +429,34 @@ def summarize_by_student_test_school_year(
             how='left'
         )
     )
-    students_tests['met_attainment_goal'] = (students_tests['ending_risk_level'] == 'lowRisk')
-    students_tests['met_growth_goal'] = (students_tests['starting_risk_level'] == 'highRisk') & (students_tests['ending_risk_level'] != 'highRisk')
-    students_tests['met_goal'] = students_tests['met_attainment_goal'] | students_tests['met_growth_goal']
-    students_tests['num_days'] = (
+    students['met_attainment_goal'] = (students['ending_risk_level'] == 'lowRisk')
+    students['met_growth_goal'] = (students['starting_risk_level'] == 'highRisk') & (students['ending_risk_level'] != 'highRisk')
+    students['met_goal'] = students['met_attainment_goal'] | students['met_growth_goal']
+    students['num_days'] = (
         np.subtract(
-            students_tests['ending_date'],
-            students_tests['starting_date']
+            students['ending_date'],
+            students['starting_date']
         )
         .apply(lambda x: x.days)
     )
-    students_tests['percentile_growth'] = np.subtract(
-        students_tests['ending_percentile'],
-        students_tests['starting_percentile']
+    students['percentile_growth'] = np.subtract(
+        students['ending_percentile'],
+        students['starting_percentile']
     )
-    students_tests.loc[students_tests['num_days'] == 0, 'percentile_growth'] = np.nan
-    students_tests['percentile_growth_per_year'] = (
-        students_tests
+    students.loc[students['num_days'] == 0, 'percentile_growth'] = np.nan
+    students['percentile_growth_per_year'] = (
+        students
         .apply(
             lambda row: row['percentile_growth']/(row['num_days']/365.25) if not pd.isna(row['percentile_growth']) and row['num_days'] > 0 else np.nan,
             axis=1
         )
     )
-    students_tests = students_tests.join(
+    students = students.join(
         student_info,
         how='left',
         on=['fast_id', 'school_year']
     )
-    students_tests = students_tests.reindex(columns=[
+    students = students.reindex(columns=[
         'local_id',
         'state_id',
         'first_name',
@@ -479,10 +481,20 @@ def summarize_by_student_test_school_year(
         'percentile_growth',
         'percentile_growth_per_year'
     ])
-    return students_tests
+    if filter_dict is not None:
+        students = wf_core_data.utils.filter_dataframe(
+            dataframe=students,
+            filter_dict=filter_dict
+        )
+    if select_dict is not None:
+        students = wf_core_data.utils.select_from_dataframe(
+            dataframe=students,
+            select_dict=select_dict
+        )
+    return students
 
 def summarize_by_student_group(
-    students_tests,
+    students,
     grouping_variables=[
         'school_year',
         'school',
@@ -491,7 +503,7 @@ def summarize_by_student_group(
     ]
 ):
     student_groups = (
-        students_tests
+        students
         .reset_index()
         .groupby(grouping_variables)
         .agg(

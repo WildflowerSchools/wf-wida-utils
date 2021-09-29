@@ -73,3 +73,26 @@ def infer_school_year(
             date.year,
             date.year + 1
         )
+
+def filter_dataframe(
+    dataframe,
+    filter_dict=None
+):
+    if filter_dict is None:
+        return dataframe
+    index_columns = dataframe.index.names
+    dataframe=dataframe.reset_index()
+    for key, value_list in filter_dict.items():
+        dataframe = dataframe.loc[dataframe[key].isin(value_list)]
+    dataframe.set_index(index_columns, inplace=True)
+    return dataframe
+
+def select_from_dataframe(
+    dataframe,
+    select_dict=None
+):
+    if select_dict is None:
+        return dataframe
+    keys, values = zip(*select_dict.items())
+    dataframe = dataframe.xs(values, level=keys)
+    return dataframe
