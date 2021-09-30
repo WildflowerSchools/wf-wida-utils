@@ -381,6 +381,7 @@ def extract_student_info(
 def summarize_by_student(
     test_events,
     student_info,
+    min_growth_days=60,
     filter_dict=None,
     select_dict=None
 ):
@@ -443,7 +444,7 @@ def summarize_by_student(
         students['ending_percentile'],
         students['starting_percentile']
     )
-    students.loc[students['num_days'] == 0, 'percentile_growth'] = np.nan
+    students.loc[students['num_days'] < min_growth_days, 'percentile_growth'] = np.nan
     students['percentile_growth_per_year'] = (
         students
         .apply(
