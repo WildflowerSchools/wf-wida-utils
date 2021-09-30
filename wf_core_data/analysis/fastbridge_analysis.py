@@ -493,16 +493,18 @@ def summarize_by_student(
         )
     return students
 
-def summarize_by_student_group(
+def summarize_by_group(
     students,
     grouping_variables=[
         'school_year',
         'school',
         'test',
         'subtest'
-    ]
+    ],
+    filter_dict=None,
+    select_dict=None
 ):
-    student_groups = (
+    groups = (
         students
         .reset_index()
         .groupby(grouping_variables)
@@ -519,11 +521,11 @@ def summarize_by_student_group(
         )
         .dropna(how='all')
     )
-    student_groups = student_groups.loc[student_groups['num_valid_test_results'] > 0].copy()
-    student_groups['frac_met_growth_goal'] = student_groups['num_met_growth_goal'].astype('float')/student_groups['num_valid_goal_info'].astype('float')
-    student_groups['frac_met_attainment_goal'] = student_groups['num_met_attainment_goal'].astype('float')/student_groups['num_valid_goal_info'].astype('float')
-    student_groups['frac_met_goal'] = student_groups['num_met_goal'].astype('float')/student_groups['num_valid_goal_info'].astype('float')
-    student_groups = student_groups.reindex(columns=[
+    groups = groups.loc[groups['num_valid_test_results'] > 0].copy()
+    groups['frac_met_growth_goal'] = groups['num_met_growth_goal'].astype('float')/groups['num_valid_goal_info'].astype('float')
+    groups['frac_met_attainment_goal'] = groups['num_met_attainment_goal'].astype('float')/groups['num_valid_goal_info'].astype('float')
+    groups['frac_met_goal'] = groups['num_met_goal'].astype('float')/groups['num_valid_goal_info'].astype('float')
+    groups = groups.reindex(columns=[
         'num_valid_test_results',
         'num_valid_goal_info',
         'frac_met_growth_goal',
@@ -534,7 +536,17 @@ def summarize_by_student_group(
         'num_valid_percentile_growth_per_year',
         'mean_percentile_growth_per_year'
     ])
-    return student_groups
+    if filter_dict is not None:
+        groups = wf_core_data.utils.filter_dataframe(
+            dataframe=groups,
+            filter_dict=filter_dict
+        )
+    if select_dict is not None:
+        groups = wf_core_data.utils.select_from_dataframe(
+            dataframe=groups,
+            select_dict=select_dict
+        )
+    return groups
 
 def infer_school_year_from_results(
     results,
