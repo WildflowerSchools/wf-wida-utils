@@ -378,11 +378,14 @@ def extract_student_info(
     ])
     return student_info
 
-def summarize_by_student_test_school_year(
+def summarize_by_student(
     test_events,
-    student_info
+    student_info,
+    min_growth_days=60,
+    filter_dict=None,
+    select_dict=None
 ):
-    students_tests = (
+    students = (
         test_events
         .reset_index()
         .pivot(
@@ -391,7 +394,7 @@ def summarize_by_student_test_school_year(
             values=['test_date', 'risk_level', 'percentile']
         )
     )
-    students_tests.columns = ['{}_{}'.format(x[0], x[1].lower()) for x in students_tests.columns]
+    students.columns = ['{}_{}'.format(x[0], x[1].lower()) for x in students.columns]
     goals = (
         test_events
         .dropna(subset=['risk_level'])
@@ -416,8 +419,8 @@ def summarize_by_student_test_school_year(
             ending_percentile=('percentile', lambda x: x.dropna().iloc[-1]),
         )
     )
-    students_tests = (
-    students_tests
+    students = (
+    students
         .join(
             goals,
             how='left'
@@ -427,34 +430,34 @@ def summarize_by_student_test_school_year(
             how='left'
         )
     )
-    students_tests['met_attainment_goal'] = (students_tests['ending_risk_level'] == 'lowRisk')
-    students_tests['met_growth_goal'] = (students_tests['starting_risk_level'] == 'highRisk') & (students_tests['ending_risk_level'] != 'highRisk')
-    students_tests['met_goal'] = students_tests['met_attainment_goal'] | students_tests['met_growth_goal']
-    students_tests['num_days'] = (
+    students['met_attainment_goal'] = (students['ending_risk_level'] == 'lowRisk')
+    students['met_growth_goal'] = (students['starting_risk_level'] == 'highRisk') & (students['ending_risk_level'] != 'highRisk')
+    students['met_goal'] = students['met_attainment_goal'] | students['met_growth_goal']
+    students['num_days'] = (
         np.subtract(
-            students_tests['ending_date'],
-            students_tests['starting_date']
+            students['ending_date'],
+            students['starting_date']
         )
         .apply(lambda x: x.days)
     )
-    students_tests['percentile_growth'] = np.subtract(
-        students_tests['ending_percentile'],
-        students_tests['starting_percentile']
+    students['percentile_growth'] = np.subtract(
+        students['ending_percentile'],
+        students['starting_percentile']
     )
-    students_tests.loc[students_tests['num_days'] == 0, 'percentile_growth'] = np.nan
-    students_tests['percentile_growth_per_year'] = (
-        students_tests
+    students.loc[students['num_days'] < min_growth_days, 'percentile_growth'] = np.nan
+    students['percentile_growth_per_year'] = (
+        students
         .apply(
             lambda row: row['percentile_growth']/(row['num_days']/365.25) if not pd.isna(row['percentile_growth']) and row['num_days'] > 0 else np.nan,
             axis=1
         )
     )
-    students_tests = students_tests.join(
+    students = students.join(
         student_info,
         how='left',
         on=['fast_id', 'school_year']
     )
-    students_tests = students_tests.reindex(columns=[
+    students = students.reindex(columns=[
         'local_id',
         'state_id',
         'first_name',
@@ -479,19 +482,31 @@ def summarize_by_student_test_school_year(
         'percentile_growth',
         'percentile_growth_per_year'
     ])
-    return students_tests
+    if filter_dict is not None:
+        students = wf_core_data.utils.filter_dataframe(
+            dataframe=students,
+            filter_dict=filter_dict
+        )
+    if select_dict is not None:
+        students = wf_core_data.utils.select_from_dataframe(
+            dataframe=students,
+            select_dict=select_dict
+        )
+    return students
 
-def summarize_by_student_group(
-    students_tests,
+def summarize_by_group(
+    students,
     grouping_variables=[
         'school_year',
         'school',
         'test',
         'subtest'
-    ]
+    ],
+    filter_dict=None,
+    select_dict=None
 ):
-    student_groups = (
-        students_tests
+    groups = (
+        students
         .reset_index()
         .groupby(grouping_variables)
         .agg(
@@ -507,11 +522,11 @@ def summarize_by_student_group(
         )
         .dropna(how='all')
     )
-    student_groups = student_groups.loc[student_groups['num_valid_test_results'] > 0].copy()
-    student_groups['frac_met_growth_goal'] = student_groups['num_met_growth_goal'].astype('float')/student_groups['num_valid_goal_info'].astype('float')
-    student_groups['frac_met_attainment_goal'] = student_groups['num_met_attainment_goal'].astype('float')/student_groups['num_valid_goal_info'].astype('float')
-    student_groups['frac_met_goal'] = student_groups['num_met_goal'].astype('float')/student_groups['num_valid_goal_info'].astype('float')
-    student_groups = student_groups.reindex(columns=[
+    groups = groups.loc[groups['num_valid_test_results'] > 0].copy()
+    groups['frac_met_growth_goal'] = groups['num_met_growth_goal'].astype('float')/groups['num_valid_goal_info'].astype('float')
+    groups['frac_met_attainment_goal'] = groups['num_met_attainment_goal'].astype('float')/groups['num_valid_goal_info'].astype('float')
+    groups['frac_met_goal'] = groups['num_met_goal'].astype('float')/groups['num_valid_goal_info'].astype('float')
+    groups = groups.reindex(columns=[
         'num_valid_test_results',
         'num_valid_goal_info',
         'frac_met_growth_goal',
@@ -522,7 +537,17 @@ def summarize_by_student_group(
         'num_valid_percentile_growth_per_year',
         'mean_percentile_growth_per_year'
     ])
-    return student_groups
+    if filter_dict is not None:
+        groups = wf_core_data.utils.filter_dataframe(
+            dataframe=groups,
+            filter_dict=filter_dict
+        )
+    if select_dict is not None:
+        groups = wf_core_data.utils.select_from_dataframe(
+            dataframe=groups,
+            select_dict=select_dict
+        )
+    return groups
 
 def infer_school_year_from_results(
     results,
