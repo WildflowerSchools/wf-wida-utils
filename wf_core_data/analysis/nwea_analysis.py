@@ -161,8 +161,9 @@ def fetch_results_local_file_nwea(
 
 def parse_results_nwea(results):
     test_events = extract_test_events_nwea(results)
-    student_info = extract_student_info_nwea(results)
-    return test_events, student_info
+    student_info, student_info_changes = extract_student_info_nwea(results)
+    student_assignments = extract_student_assignments_nwea(results)
+    return test_events, student_info, student_info_changes, student_assignments
 
 def extract_test_events_nwea(
     results
@@ -230,40 +231,74 @@ def extract_student_info_nwea(
             'TermTested': 'term_school_year',
             'DistrictName': 'legal_entity',
             'StudentID': 'student_id_nwea',
-            'SchoolName': 'school',
-            'Teacher': 'teacher_last_first',
-            'ClassName': 'classroom',
             'StudentLastName': 'last_name',
-            'StudentFirstName': 'first_name',
-            'StudentGrade': 'grade'
+            'StudentFirstName': 'first_name'
         })
     )
     student_info['term'] = student_info['term_school_year'].apply(lambda x: x.split(' ')[0])
     student_info['school_year'] = student_info['term_school_year'].apply(lambda x: x.split(' ')[1])
-    student_info = student_info.reindex(columns=[
-        'legal_entity',
-        'student_id_nwea',
-        'school_year',
-        'first_name',
-        'last_name',
-        'school',
-        'classroom',
-        'teacher_last_first',
-        'grade'
-    ])
     student_info = (
         student_info
-        .drop_duplicates()
-        .set_index([
+        .reindex(columns=[
             'legal_entity',
             'student_id_nwea',
-            'school_year'
+            'school_year',
+            'term',
+            'first_name',
+            'last_name'
         ])
+        .drop_duplicates()
+    )
+    student_info_changes = (
+        student_info
+        .groupby(['legal_entity', 'student_id_nwea'])
+        .filter(lambda group: len(group.drop_duplicates(subset=['first_name', 'last_name'])) > 1)
+    )
+    student_info = (
+        student_info
+        .sort_values(['school_year', 'term'])
+        .drop(columns=['school_year', 'term'])
+        .groupby((['legal_entity', 'student_id_nwea']))
+        .tail(1)
+        .set_index(['legal_entity', 'student_id_nwea'])
         .sort_index()
     )
-    if student_info.index.duplicated().any():
-        raise ValueError('Files contain conflicting info for the same school year and student ID')
-    return student_info
+    return student_info, student_info_changes
+
+def extract_student_assignments_nwea(
+    results
+):
+    student_assignments = (
+        results
+        .rename(columns= {
+            'TermTested': 'term_school_year',
+            'DistrictName': 'legal_entity',
+            'StudentID': 'student_id_nwea',
+            'SchoolName': 'school',
+            'Teacher': 'teacher_last_first',
+            'ClassName': 'classroom',
+            'StudentGrade': 'grade'
+        })
+    )
+    student_assignments['term'] = student_assignments['term_school_year'].apply(lambda x: x.split(' ')[0])
+    student_assignments['school_year'] = student_assignments['term_school_year'].apply(lambda x: x.split(' ')[1])
+    student_assignments = (
+        student_assignments
+        .reindex(columns=[
+            'legal_entity',
+            'student_id_nwea',
+            'school_year',
+            'term',
+            'school',
+            'teacher_last_first',
+            'classroom',
+            'grade'
+        ])
+        .drop_duplicates()
+        .set_index(['legal_entity', 'student_id_nwea', 'school_year', 'term'])
+        .sort_index()
+    )
+    return student_assignments
 
 def summarize_by_student_nwea(
     test_events,
@@ -281,6 +316,7 @@ def summarize_by_student_nwea(
         .unstack(unstack_variables)
     )
     students.columns = ['_'.join([inflection.underscore(variable_name) for variable_name in x]) for x in students.columns]
+    underlying_data_columns = list(students.columns)
     rit_scores = (
         test_events
         .dropna(subset=['rit_score'])
@@ -343,33 +379,19 @@ def summarize_by_student_nwea(
     students = students.join(
         student_info,
         how='left',
-        on=['legal_entity', 'student_id_nwea', 'school_year']
+        on=['legal_entity', 'student_id_nwea']
     )
-    students = students.reindex(columns=[
-        'first_name',
-        'last_name',
-        'school',
-        'classroom',
-        'teacher_last_first',
-        'grade',
-        'test_date_fall',
-        'test_date_winter',
-        'test_date_spring',
-        'rit_score_fall',
-        'rit_score_sem_fall',
-        'rit_score_winter',
-        'rit_score_sem_winter',
-        'rit_score_spring',
-        'rit_score_sem_spring',
-        'rit_score_growth',
-        'percentile_fall',
-        'percentile_se_fall',
-        'percentile_winter',
-        'percentile_se_winter',
-        'percentile_spring',
-        'percentile_se_spring',
-        'percentile_growth',
-    ])
+    students = students.reindex(columns=
+        [
+            'first_name',
+            'last_name'
+        ] +
+        underlying_data_columns +
+        [
+            'rit_score_growth',
+            'percentile_growth'
+        ]
+    )
     if filter_dict is not None:
         students = wf_core_data.utils.filter_dataframe(
             dataframe=students,
