@@ -9,7 +9,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-NWEA_TERMS = (
+TERMS_NWEA = (
     'Fall',
     'Winter',
     'Spring'
@@ -108,122 +108,46 @@ NWEA_TERMS = (
 #     .tolist()
 # )
 #
-# DEFAULT_ROLLOVER_MONTH = 7
-# DEFAULT_ROLLOVER_DAY = 31
 
-def fetch_and_parse_nwea_results_local_directory(
-    dir_path
-    # rollover_month=DEFAULT_ROLLOVER_MONTH,
-    # rollover_day=DEFAULT_ROLLOVER_DAY
+def fetch_results_local_directory_nwea(
+    path,
+    file_extensions=['.csv', '.CSV']
 ):
-    if not os.path.exists(dir_path):
-        raise ValueError('Path \'{}\' not found'.format(dir_path))
-    if not os.path.isdir(dir_path):
-        raise ValueError('Object at \'{}\' is not a directory'.format(dir_path))
+    if not os.path.exists(path):
+        raise ValueError('Path \'{}\' not found'.format(path))
+    if not os.path.isdir(path):
+        raise ValueError('Object at \'{}\' is not a directory'.format(path))
     paths = list()
-    for directory_entry in os.listdir(dir_path):
+    for directory_entry in os.listdir(path):
         file_path = os.path.join(
-            dir_path,
+            path,
             directory_entry
         )
         if not os.path.isfile(file_path):
             continue
         file_extension = os.path.splitext(os.path.normpath(file_path))[1]
-        if file_extension not in ['.csv', '.CSV']:
+        if file_extension not in file_extensions:
             continue
         paths.append(file_path)
     if len(paths) == 0:
-        raise ValueError('No CSV files found in directory')
-    test_events, student_info = fetch_and_parse_nwea_results_local_files(
-        paths=paths
-        # rollover_month=rollover_month,
-        # rollover_day=rollover_day
-    )
-    return test_events, student_info
+        raise ValueError('No files of type {} found in directory'.format(file_extensions))
+    results = fetch_results_local_files_nwea(paths)
+    return results
 
-def fetch_and_parse_nwea_results_local_files(
+def fetch_results_local_files_nwea(
     paths
-    # rollover_month=DEFAULT_ROLLOVER_MONTH,
-    # rollover_day=DEFAULT_ROLLOVER_DAY
 ):
-    test_events_list=list()
-    student_info_list=list()
+    results_list = list()
     for path in paths:
-        results = fetch_nwea_results_local_file(
+        results_file = fetch_results_local_file_nwea(
             path=path
-            # school_year=None,
-            # rollover_month=rollover_month,
-            # rollover_day=rollover_day
         )
-        test_events_file = extract_nwea_test_events(
-            results=results
-        )
-        student_info_file=extract_nwea_student_info(
-            results=results
-        )
-        test_events_list.append(test_events_file)
-        student_info_list.append(student_info_file)
-    test_events = pd.concat(
-        test_events_list
-    )
-    student_info = pd.concat(
-        student_info_list
-    )
-    test_events.sort_index(inplace=True)
-    student_info = (
-        student_info
-        .reset_index()
-        .drop_duplicates()
-        .set_index([
-            'legal_entity',
-            'student_id_nwea',
-            'school_year'
-        ])
-        .sort_index()
-    )
-    if student_info.index.duplicated().any():
-        raise ValueError('Files contain conflicting info for the same school year, term, and student ID')
-    return test_events, student_info
+        results_list.append(results_file)
+    results = pd.concat(results_list)
+    return results
 
-def fetch_nwea_results_local_file_and_extract_test_events(
+def fetch_results_local_file_nwea(
     path
-    # school_year=None,
-    # rollover_month=DEFAULT_ROLLOVER_MONTH,
-    # rollover_day=DEFAULT_ROLLOVER_DAY
-):
-    results = fetch_nwea_results_local_file(
-        path=path
-        # school_year=school_year,
-        # rollover_month=rollover_month,
-        # rollover_day=rollover_day
-    )
-    test_events = extract_nwea_test_events(
-        results=results
-    )
-    student_info = extract_nwea_student_info(
-        results=results
-    )
-    test_events.sort_index(inplace=True)
-    student_info = (
-        student_info
-        .reset_index()
-        .drop_duplicates()
-        .set_index([
-            'legal_entity',
-            'student_id_nwea',
-            'school_year'
-        ])
-        .sort_index()
-    )
-    if student_info.index.duplicated().any():
-        raise ValueError('Files contain conflicting info for the same school year, term, and student ID')
-    return test_events, student_info
-
-def fetch_nwea_results_local_file(
-    path
-    # school_year=None,
-    # rollover_month=DEFAULT_ROLLOVER_MONTH,
-    # rollover_day=DEFAULT_ROLLOVER_DAY
 ):
     if not os.path.exists(path):
         raise ValueError('File \'{}\' not found'.format(path))
@@ -233,16 +157,14 @@ def fetch_nwea_results_local_file(
         path,
         dtype='object'
     )
-    # if school_year is None:
-    #     school_year=infer_school_year_from_results(
-    #         results,
-    #         rollover_month=rollover_month,
-    #         rollover_day=rollover_day
-    #     )
-    # results.insert(0, 'school_year', school_year)
     return results
 
-def extract_nwea_test_events(
+def parse_results_nwea(results):
+    test_events = extract_test_events_nwea(results)
+    student_info = extract_student_info_nwea(results)
+    return test_events, student_info
+
+def extract_test_events_nwea(
     results
 ):
     test_events = (
@@ -264,29 +186,14 @@ def extract_nwea_test_events(
     test_events['school_year'] = test_events['term_school_year'].apply(lambda x: x.split(' ')[1])
     test_events['term'] = pd.Categorical(
         test_events['term'],
-        categories=NWEA_TERMS,
+        categories=TERMS_NWEA,
         ordered=True
     )
-    # test_events['test'] = pd.Categorical(
-    #     test_events['test'],
-    #     categories=ASSESSMENTS.keys(),
-    #     ordered=True
-    # )
-    # test_events['subtest'] = pd.Categorical(
-    #     test_events['subtest'],
-    #     categories=itertools.chain(*ASSESSMENTS.values()),
-    #     ordered=True
-    # )
     test_events['test_date'] = test_events['test_date'].apply(wf_core_data.utils.to_date)
     test_events['rit_score'] = pd.to_numeric(test_events['rit_score']).astype('float')
     test_events['rit_score_sem'] = pd.to_numeric(test_events['rit_score_sem']).astype('float')
     test_events['percentile'] = pd.to_numeric(test_events['percentile']).astype('float')
     test_events['percentile_se'] = pd.to_numeric(test_events['percentile_se'].replace('<1', 0.5)).astype('float')
-    # test_events['risk_level'] = pd.Categorical(
-    #     test_events['risk_level'],
-    #     categories=RISK_LEVELS,
-    #     ordered=True
-    # )
     test_events = test_events.reindex(columns=[
         'school_year',
         'term',
@@ -314,7 +221,7 @@ def extract_nwea_test_events(
     test_events.sort_index(inplace=True)
     return test_events
 
-def extract_nwea_student_info(
+def extract_student_info_nwea(
     results
 ):
     student_info = (
@@ -355,7 +262,6 @@ def extract_nwea_student_info(
         .sort_index()
     )
     if student_info.index.duplicated().any():
-        # print(student_info.loc[student_info.index.duplicated(keep=False)])
         raise ValueError('Files contain conflicting info for the same school year and student ID')
     return student_info
 
