@@ -1,6 +1,7 @@
 import wf_core_data.utils
 import pandas as pd
 import numpy as np
+import inflection
 import collections
 import itertools
 import os
@@ -176,8 +177,7 @@ def fetch_and_parse_nwea_results_local_files(
         .set_index([
             'legal_entity',
             'student_id_nwea',
-            'school_year',
-            'term'
+            'school_year'
         ])
         .sort_index()
     )
@@ -211,8 +211,7 @@ def fetch_nwea_results_local_file_and_extract_test_events(
         .set_index([
             'legal_entity',
             'student_id_nwea',
-            'school_year',
-            'term'
+            'school_year'
         ])
         .sort_index()
     )
@@ -279,8 +278,8 @@ def extract_nwea_test_events(
     #     ordered=True
     # )
     test_events['test_date'] = test_events['test_date'].apply(wf_core_data.utils.to_date)
-    test_events['rit'] = pd.to_numeric(test_events['percentile']).astype('float')
-    test_events['rit_sem'] = pd.to_numeric(test_events['percentile']).astype('float')
+    test_events['rit_score'] = pd.to_numeric(test_events['rit_score']).astype('float')
+    test_events['rit_score_sem'] = pd.to_numeric(test_events['rit_score_sem']).astype('float')
     test_events['percentile'] = pd.to_numeric(test_events['percentile']).astype('float')
     test_events['percentile_se'] = pd.to_numeric(test_events['percentile_se'].replace('<1', 0.5)).astype('float')
     # test_events['risk_level'] = pd.Categorical(
@@ -334,16 +333,10 @@ def extract_nwea_student_info(
     )
     student_info['term'] = student_info['term_school_year'].apply(lambda x: x.split(' ')[0])
     student_info['school_year'] = student_info['term_school_year'].apply(lambda x: x.split(' ')[1])
-    student_info['term'] = pd.Categorical(
-        student_info['term'],
-        categories=NWEA_TERMS,
-        ordered=True
-    )
     student_info = student_info.reindex(columns=[
         'legal_entity',
         'student_id_nwea',
         'school_year',
-        'term',
         'first_name',
         'last_name',
         'school',
@@ -357,132 +350,132 @@ def extract_nwea_student_info(
         .set_index([
             'legal_entity',
             'student_id_nwea',
-            'school_year',
-            'term'
+            'school_year'
         ])
         .sort_index()
     )
     if student_info.index.duplicated().any():
         # print(student_info.loc[student_info.index.duplicated(keep=False)])
-        raise ValueError('Files contain conflicting info for the same school year, term, and student ID')
+        raise ValueError('Files contain conflicting info for the same school year and student ID')
     return student_info
 
-# def summarize_by_student(
-#     test_events,
-#     student_info,
-#     min_growth_days=60,
-#     filter_dict=None,
-#     select_dict=None
-# ):
-#     students = (
-#         test_events
-#         .reset_index()
-#         .pivot(
-#             index=['school_year', 'test', 'subtest', 'student_id_nwea'],
-#             columns = 'term',
-#             values=['test_date', 'risk_level', 'percentile']
-#         )
-#     )
-#     students.columns = ['{}_{}'.format(x[0], x[1].lower()) for x in students.columns]
-#     goals = (
-#         test_events
-#         .dropna(subset=['risk_level'])
-#         .reorder_levels(['school_year', 'test', 'subtest', 'student_id_nwea', 'term'])
-#         .sort_index()
-#         .groupby(['school_year', 'test', 'subtest', 'student_id_nwea'])
-#         .agg(
-#             starting_risk_level=('risk_level', lambda x: x.dropna().iloc[0]),
-#             ending_risk_level=('risk_level', lambda x: x.dropna().iloc[-1]),
-#         )
-#     )
-#     percentiles = (
-#         test_events
-#         .dropna(subset=['percentile'])
-#         .reorder_levels(['school_year', 'test', 'subtest', 'student_id_nwea', 'term'])
-#         .sort_index()
-#         .groupby(['school_year', 'test', 'subtest', 'student_id_nwea'])
-#         .agg(
-#             starting_date=('test_date', lambda x: x.dropna().iloc[0]),
-#             ending_date=('test_date', lambda x: x.dropna().iloc[-1]),
-#             starting_percentile=('percentile', lambda x: x.dropna().iloc[0]),
-#             ending_percentile=('percentile', lambda x: x.dropna().iloc[-1]),
-#         )
-#     )
-#     students = (
-#     students
-#         .join(
-#             goals,
-#             how='left'
-#         )
-#         .join(
-#             percentiles,
-#             how='left'
-#         )
-#     )
-#     students['met_attainment_goal'] = (students['ending_risk_level'] == 'lowRisk')
-#     students['met_growth_goal'] = (students['starting_risk_level'] == 'highRisk') & (students['ending_risk_level'] != 'highRisk')
-#     students['met_goal'] = students['met_attainment_goal'] | students['met_growth_goal']
-#     students['num_days'] = (
-#         np.subtract(
-#             students['ending_date'],
-#             students['starting_date']
-#         )
-#         .apply(lambda x: x.days)
-#     )
-#     students['percentile_growth'] = np.subtract(
-#         students['ending_percentile'],
-#         students['starting_percentile']
-#     )
-#     students.loc[students['num_days'] < min_growth_days, 'percentile_growth'] = np.nan
-#     students['percentile_growth_per_year'] = (
-#         students
-#         .apply(
-#             lambda row: row['percentile_growth']/(row['num_days']/365.25) if not pd.isna(row['percentile_growth']) and row['num_days'] > 0 else np.nan,
-#             axis=1
-#         )
-#     )
-#     students = students.join(
-#         student_info,
-#         how='left',
-#         on=['student_id_nwea', 'school_year']
-#     )
-#     students = students.reindex(columns=[
-#         'local_id',
-#         'state_id',
-#         'first_name',
-#         'last_name',
-#         'gender',
-#         'birth_date',
-#         'race',
-#         'school',
-#         'grade',
-#         'test_date_fall',
-#         'test_date_winter',
-#         'test_date_spring',
-#         'risk_level_fall',
-#         'risk_level_winter',
-#         'risk_level_spring',
-#         'met_growth_goal',
-#         'met_attainment_goal',
-#         'met_goal',
-#         'percentile_fall',
-#         'percentile_winter',
-#         'percentile_spring',
-#         'percentile_growth',
-#         'percentile_growth_per_year'
-#     ])
-#     if filter_dict is not None:
-#         students = wf_core_data.utils.filter_dataframe(
-#             dataframe=students,
-#             filter_dict=filter_dict
-#         )
-#     if select_dict is not None:
-#         students = wf_core_data.utils.select_from_dataframe(
-#             dataframe=students,
-#             select_dict=select_dict
-#         )
-#     return students
-#
+def summarize_by_student_nwea(
+    test_events,
+    student_info,
+    min_growth_days=60,
+    unstack_variables=['term'],
+    filter_dict=None,
+    select_dict=None
+):
+    new_index_variables = list(test_events.index.names)
+    for unstack_variable in unstack_variables:
+        new_index_variables.remove(unstack_variable)
+    students = (
+        test_events
+        .unstack(unstack_variables)
+    )
+    students.columns = ['_'.join([inflection.underscore(variable_name) for variable_name in x]) for x in students.columns]
+    rit_scores = (
+        test_events
+        .dropna(subset=['rit_score'])
+        .sort_values('test_date')
+        .groupby(new_index_variables)
+        .agg(
+            rit_score_starting_date=('test_date', lambda x: x.iloc[0]),
+            rit_score_ending_date=('test_date', lambda x: x.iloc[-1]),
+            starting_rit_score=('rit_score', lambda x: x.iloc[0]),
+            ending_rit_score=('rit_score', lambda x: x.iloc[-1]),
+        )
+    )
+    percentiles = (
+        test_events
+        .dropna(subset=['percentile'])
+        .sort_values('test_date')
+        .groupby(new_index_variables)
+        .agg(
+            percentile_starting_date=('test_date', lambda x: x.dropna().iloc[0]),
+            percentile_ending_date=('test_date', lambda x: x.dropna().iloc[-1]),
+            starting_percentile=('percentile', lambda x: x.dropna().iloc[0]),
+            ending_percentile=('percentile', lambda x: x.dropna().iloc[-1]),
+        )
+    )
+    students = (
+    students
+        .join(
+            rit_scores,
+            how='left'
+        )
+        .join(
+            percentiles,
+            how='left'
+        )
+    )
+    students['rit_score_num_days'] = (
+        np.subtract(
+            students['rit_score_ending_date'],
+            students['rit_score_starting_date']
+        )
+        .apply(lambda x: x.days)
+    )
+    students['rit_score_growth'] = np.subtract(
+        students['ending_rit_score'],
+        students['starting_rit_score']
+    )
+    students.loc[students['rit_score_num_days'] < min_growth_days, 'rit_score_growth'] = np.nan
+    students['percentile_num_days'] = (
+        np.subtract(
+            students['percentile_ending_date'],
+            students['percentile_starting_date']
+        )
+        .apply(lambda x: x.days)
+    )
+    students['percentile_growth'] = np.subtract(
+        students['ending_percentile'],
+        students['starting_percentile']
+    )
+    students.loc[students['percentile_num_days'] < min_growth_days, 'percentile_growth'] = np.nan
+    students = students.join(
+        student_info,
+        how='left',
+        on=['legal_entity', 'student_id_nwea', 'school_year']
+    )
+    students = students.reindex(columns=[
+        'first_name',
+        'last_name',
+        'school',
+        'classroom',
+        'teacher_last_first',
+        'grade',
+        'test_date_fall',
+        'test_date_winter',
+        'test_date_spring',
+        'rit_score_fall',
+        'rit_score_sem_fall',
+        'rit_score_winter',
+        'rit_score_sem_winter',
+        'rit_score_spring',
+        'rit_score_sem_spring',
+        'rit_score_growth',
+        'percentile_fall',
+        'percentile_se_fall',
+        'percentile_winter',
+        'percentile_se_winter',
+        'percentile_spring',
+        'percentile_se_spring',
+        'percentile_growth',
+    ])
+    if filter_dict is not None:
+        students = wf_core_data.utils.filter_dataframe(
+            dataframe=students,
+            filter_dict=filter_dict
+        )
+    if select_dict is not None:
+        students = wf_core_data.utils.select_from_dataframe(
+            dataframe=students,
+            select_dict=select_dict
+        )
+    return students
+
 # def summarize_by_group(
 #     students,
 #     grouping_variables=[
