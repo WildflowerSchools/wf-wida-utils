@@ -388,6 +388,7 @@ def summarize_by_student_nwea(
         ] +
         underlying_data_columns +
         [
+            'ending_percentile',
             'rit_score_growth',
             'percentile_growth'
         ]
@@ -404,90 +405,50 @@ def summarize_by_student_nwea(
         )
     return students
 
-# def summarize_by_group(
-#     students,
-#     grouping_variables=[
-#         'school_year',
-#         'school',
-#         'test',
-#         'subtest'
-#     ],
-#     filter_dict=None,
-#     select_dict=None
-# ):
-#     groups = (
-#         students
-#         .reset_index()
-#         .groupby(grouping_variables)
-#         .agg(
-#             num_valid_test_results=('student_id_nwea', 'count'),
-#             num_valid_goal_info=('met_goal', 'count'),
-#             num_met_growth_goal=('met_growth_goal', 'sum'),
-#             num_met_attainment_goal=('met_attainment_goal', 'sum'),
-#             num_met_goal=('met_goal', 'sum'),
-#             num_valid_percentile_growth=('percentile_growth', 'count'),
-#             mean_percentile_growth=('percentile_growth', 'mean'),
-#             num_valid_percentile_growth_per_year=('percentile_growth_per_year', 'count'),
-#             mean_percentile_growth_per_year=('percentile_growth_per_year', 'mean')
-#         )
-#         .dropna(how='all')
-#     )
-#     groups = groups.loc[groups['num_valid_test_results'] > 0].copy()
-#     groups['frac_met_growth_goal'] = groups['num_met_growth_goal'].astype('float')/groups['num_valid_goal_info'].astype('float')
-#     groups['frac_met_attainment_goal'] = groups['num_met_attainment_goal'].astype('float')/groups['num_valid_goal_info'].astype('float')
-#     groups['frac_met_goal'] = groups['num_met_goal'].astype('float')/groups['num_valid_goal_info'].astype('float')
-#     groups = groups.reindex(columns=[
-#         'num_valid_test_results',
-#         'num_valid_goal_info',
-#         'frac_met_growth_goal',
-#         'frac_met_attainment_goal',
-#         'frac_met_goal',
-#         'num_valid_percentile_growth',
-#         'mean_percentile_growth',
-#         'num_valid_percentile_growth_per_year',
-#         'mean_percentile_growth_per_year'
-#     ])
-#     if filter_dict is not None:
-#         groups = wf_core_data.utils.filter_dataframe(
-#             dataframe=groups,
-#             filter_dict=filter_dict
-#         )
-#     if select_dict is not None:
-#         groups = wf_core_data.utils.select_from_dataframe(
-#             dataframe=groups,
-#             select_dict=select_dict
-#         )
-#     return groups
-#
-# def infer_school_year_from_results(
-#     results,
-#     rollover_month=DEFAULT_ROLLOVER_MONTH,
-#     rollover_day=DEFAULT_ROLLOVER_DAY
-# ):
-#     school_years = list()
-#     for field_name in TEST_DATE_FIELD_NAMES:
-#         if field_name not in results.columns:
-#             continue
-#         school_years_subtest = (
-#             results[field_name]
-#             .apply(lambda x: wf_core_data.utils.infer_school_year(
-#                 wf_core_data.utils.to_date(x),
-#                 rollover_month=rollover_month,
-#                 rollover_day=rollover_day
-#             ))
-#             .dropna()
-#             .unique()
-#             .tolist()
-#         )
-#         # print(school_years_subtest)
-#         school_years.extend(school_years_subtest)
-#     # print(school_years)
-#     school_years = np.unique(school_years).tolist()
-#     # print(school_years)
-#     if len(school_years) == 0:
-#         raise ValueError('No parseable test dates found')
-#     if len(school_years) > 1:
-#         raise ValueError('Data contains multiple school years')
-#     school_year = school_years[0]
-#     # print(school_year)
-#     return school_year
+def summarize_by_group_nwea(
+    students,
+    grouping_variables=[
+        'school_year',
+        'legal_entity',
+        'subject',
+        'course'
+    ],
+    filter_dict=None,
+    select_dict=None
+):
+    groups = (
+        students
+        .reset_index()
+        .groupby(grouping_variables)
+        .agg(
+            num_valid_test_results=('student_id_nwea', 'count'),
+            num_valid_rit_score_growth=('rit_score_growth', 'count'),
+            mean_rit_score_growth=('rit_score_growth', 'mean'),
+            num_valid_percentile=('ending_percentile', 'count'),
+            mean_percentile=('ending_percentile', 'mean'),
+            num_valid_percentile_growth=('percentile_growth', 'count'),
+            mean_percentile_growth=('percentile_growth', 'mean')
+        )
+        .dropna(how='all')
+    )
+    groups = groups.loc[groups['num_valid_test_results'] > 0].copy()
+    groups = groups.reindex(columns=[
+        'num_valid_test_results',
+        'num_valid_rit_score_growth',
+        'mean_rit_score_growth',
+        'num_valid_percentile',
+        'mean_percentile',
+        'num_valid_percentile_growth',
+        'mean_percentile_growth'
+    ])
+    if filter_dict is not None:
+        groups = wf_core_data.utils.filter_dataframe(
+            dataframe=groups,
+            filter_dict=filter_dict
+        )
+    if select_dict is not None:
+        groups = wf_core_data.utils.select_from_dataframe(
+            dataframe=groups,
+            select_dict=select_dict
+        )
+    return groups
