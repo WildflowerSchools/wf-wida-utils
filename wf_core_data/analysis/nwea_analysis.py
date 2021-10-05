@@ -255,6 +255,7 @@ def extract_student_assignments_nwea(
 def summarize_by_student_nwea(
     test_events,
     student_info,
+    student_assignments,
     min_growth_days=60,
     new_time_index=['school_year'],
     # unstack_variables=['term'],
@@ -341,10 +342,30 @@ def summarize_by_student_nwea(
         how='left',
         on=['legal_entity', 'student_id_nwea']
     )
+    latest_student_assignments = (
+        student_assignments
+        .reset_index()
+        .sort_values(['school_year', 'term'])
+        .groupby(STUDENT_ID_VARIABLES_NWEA + new_time_index)
+        .tail(1)
+        .set_index(STUDENT_ID_VARIABLES_NWEA + new_time_index)
+    )
+    students = students.join(
+        latest_student_assignments,
+        how='left',
+        on=latest_student_assignments.index.names
+    )
     students = students.reindex(columns=
         [
             'first_name',
             'last_name'
+        ] +
+        [
+            'school',
+            'teacher_last_first',
+            'classroom',
+            'grade'
+
         ] +
         underlying_data_columns +
         [
