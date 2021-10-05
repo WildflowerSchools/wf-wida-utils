@@ -382,23 +382,27 @@ def summarize_by_group_nwea(
         .reset_index()
         .groupby(grouping_variables)
         .agg(
-            num_valid_test_results=('student_id_nwea', 'count'),
+            num_test_results=('student_id_nwea', 'count'),
             num_valid_rit_score_growth=('rit_score_growth', 'count'),
             mean_rit_score_growth=('rit_score_growth', 'mean'),
-            num_valid_percentile=('ending_percentile', 'count'),
-            mean_percentile=('ending_percentile', 'mean'),
+            num_valid_starting_percentile=('starting_percentile', 'count'),
+            mean_starting_percentile=('starting_percentile', 'mean'),
+            num_valid_ending_percentile=('ending_percentile', 'count'),
+            mean_ending_percentile=('ending_percentile', 'mean'),
             num_valid_percentile_growth=('percentile_growth', 'count'),
             mean_percentile_growth=('percentile_growth', 'mean')
         )
         .dropna(how='all')
     )
-    groups = groups.loc[groups['num_valid_test_results'] > 0].copy()
+    groups = groups.loc[groups['num_test_results'] > 0].copy()
     groups = groups.reindex(columns=[
-        'num_valid_test_results',
+        'num_test_results',
         'num_valid_rit_score_growth',
         'mean_rit_score_growth',
-        'num_valid_percentile',
-        'mean_percentile',
+        'num_valid_starting_percentile',
+        'mean_starting_percentile',
+        'num_valid_ending_percentile',
+        'mean_ending_percentile',
         'num_valid_percentile_growth',
         'mean_percentile_growth'
     ])
