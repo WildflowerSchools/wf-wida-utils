@@ -4,7 +4,7 @@ import numpy as np
 import inflection
 import collections
 import itertools
-import functools
+import copy
 import os
 import logging
 
@@ -256,13 +256,21 @@ def summarize_by_student_nwea(
     test_events,
     student_info,
     min_growth_days=60,
-    unstack_variables=['term'],
+    new_time_index=['school_year'],
+    # unstack_variables=['term'],
     filter_dict=None,
     select_dict=None
 ):
-    new_index_variables = list(test_events.index.names)
-    for unstack_variable in unstack_variables:
-        new_index_variables.remove(unstack_variable)
+    new_index_variables = list(itertools.chain(
+        new_time_index,
+        ASSESSMENT_ID_VARIABLES_NWEA,
+        STUDENT_ID_VARIABLES_NWEA
+    ))
+    unstack_variables = copy.deepcopy(TIME_FRAME_ID_VARIABLES_NWEA)
+    for new_time_index_variable in new_time_index:
+        unstack_variables.remove(new_time_index_variable)
+    print(new_index_variables)
+    print(unstack_variables)
     students = (
         test_events
         .unstack(unstack_variables)
