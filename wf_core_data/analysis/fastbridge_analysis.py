@@ -516,7 +516,6 @@ def summarize_by_group(
             num_met_goal=('met_goal', 'sum'),
             num_valid_percentile_growth=('percentile_growth', 'count'),
             mean_percentile_growth=('percentile_growth', 'mean'),
-            num_valid_percentile_growth_per_school_year=('percentile_growth_per_school_year', 'count'),
             mean_percentile_growth_per_school_year=('percentile_growth_per_school_year', 'mean')
         )
         .dropna(how='all')
@@ -533,7 +532,6 @@ def summarize_by_group(
         'frac_met_goal',
         'num_valid_percentile_growth',
         'mean_percentile_growth',
-        'num_valid_percentile_growth_per_school_year',
         'mean_percentile_growth_per_school_year'
     ])
     if filter_dict is not None:
