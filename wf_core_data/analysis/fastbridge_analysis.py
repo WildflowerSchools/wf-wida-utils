@@ -397,24 +397,12 @@ def summarize_by_student(
     unstack_variables = copy.deepcopy(TIME_FRAME_ID_VARIABLES)
     for new_time_index_variable in new_time_index:
         unstack_variables.remove(new_time_index_variable)
-    print(new_index_variables)
-    print(unstack_variables)
     students = (
         test_events
         .unstack(unstack_variables)
     )
-    # students = (
-    #     test_events
-    #     .reset_index()
-    #     .pivot(
-    #         index=['school_year', 'test', 'subtest', 'fast_id'],
-    #         columns = 'term',
-    #         values=['test_date', 'risk_level', 'percentile']
-    #     )
-    # )
     students.columns = ['_'.join([inflection.underscore(variable_name) for variable_name in x]) for x in students.columns]
     underlying_data_columns = list(students.columns)
-    # students.columns = ['{}_{}'.format(x[0], x[1].lower()) for x in students.columns]
     goals = (
         test_events
         .dropna(subset=['risk_level'])
@@ -466,13 +454,6 @@ def summarize_by_student(
     )
     students.loc[students['percentile_num_days'] < min_growth_days, 'percentile_growth'] = np.nan
     students['percentile_growth_per_school_year'] = 365.25*(school_year_duration_months/12)*students['percentile_growth']/students['percentile_num_days']
-    # students['percentile_growth_per_year'] = (
-    #     students
-    #     .apply(
-    #         lambda row: row['percentile_growth']/(row['num_days']/365.25) if not pd.isna(row['percentile_growth']) and row['num_days'] > 0 else np.nan,
-    #         axis=1
-    #     )
-    # )
     students = students.join(
         student_info,
         how='left',
@@ -500,31 +481,6 @@ def summarize_by_student(
             'percentile_growth_per_school_year',
         ]
     )))
-    # students = students.reindex(columns=[
-    #     'local_id',
-    #     'state_id',
-    #     'first_name',
-    #     'last_name',
-    #     'gender',
-    #     'birth_date',
-    #     'race',
-    #     'school',
-    #     'grade',
-    #     'test_date_fall',
-    #     'test_date_winter',
-    #     'test_date_spring',
-    #     'risk_level_fall',
-    #     'risk_level_winter',
-    #     'risk_level_spring',
-    #     'met_growth_goal',
-    #     'met_attainment_goal',
-    #     'met_goal',
-    #     'percentile_fall',
-    #     'percentile_winter',
-    #     'percentile_spring',
-    #     'percentile_growth',
-    #     'percentile_growth_per_year'
-    # ])
     if filter_dict is not None:
         students = wf_core_data.utils.filter_dataframe(
             dataframe=students,
@@ -612,15 +568,11 @@ def infer_school_year_from_results(
             .unique()
             .tolist()
         )
-        # print(school_years_subtest)
         school_years.extend(school_years_subtest)
-    # print(school_years)
     school_years = np.unique(school_years).tolist()
-    # print(school_years)
     if len(school_years) == 0:
         raise ValueError('No parseable test dates found')
     if len(school_years) > 1:
         raise ValueError('Data contains multiple school years')
     school_year = school_years[0]
-    # print(school_year)
     return school_year
