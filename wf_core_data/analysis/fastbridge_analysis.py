@@ -1,8 +1,10 @@
 import wf_core_data.utils
 import pandas as pd
 import numpy as np
+import inflection
 import collections
 import itertools
+import copy
 import os
 import logging
 
@@ -13,11 +15,11 @@ TIME_FRAME_ID_VARIABLES = [
     'term'
 ]
 
-STUDENT_ID_VARIABLES_NWEA = [
+STUDENT_ID_VARIABLES = [
     'fast_id'
 ]
 
-STUDENT_INFO_VARIABLES_NWEA = [
+STUDENT_INFO_VARIABLES = [
     'local_id',
     'state_id',
     'first_name',
@@ -27,17 +29,17 @@ STUDENT_INFO_VARIABLES_NWEA = [
     'race'
 ]
 
-STUDENT_ASSIGNMENT_VARIABLES_NWEA = [
+STUDENT_ASSIGNMENT_VARIABLES = [
     'school',
     'grade'
 ]
 
-ASSESSMENT_ID_VARIABLES_NWEA = [
+ASSESSMENT_ID_VARIABLES = [
     'test',
     'subtest'
 ]
 
-RESULTS_VARIABLES_NWEA = [
+RESULTS_VARIABLES = [
     'test_date',
     'percentile',
     'risk_level'
@@ -381,27 +383,46 @@ def extract_student_info(
 def summarize_by_student(
     test_events,
     student_info,
-    min_growth_days=60,
+    new_time_index=['school_year'],
+    min_growth_days=DEFAULT_MIN_GROWTH_DAYS,
+    school_year_duration_months=DEFAULT_SCHOOL_YEAR_DURATION_MONTHS,
     filter_dict=None,
     select_dict=None
 ):
+    new_index_variables = list(itertools.chain(
+        new_time_index,
+        ASSESSMENT_ID_VARIABLES,
+        STUDENT_ID_VARIABLES
+    ))
+    unstack_variables = copy.deepcopy(TIME_FRAME_ID_VARIABLES)
+    for new_time_index_variable in new_time_index:
+        unstack_variables.remove(new_time_index_variable)
+    print(new_index_variables)
+    print(unstack_variables)
     students = (
         test_events
-        .reset_index()
-        .pivot(
-            index=['school_year', 'test', 'subtest', 'fast_id'],
-            columns = 'term',
-            values=['test_date', 'risk_level', 'percentile']
-        )
+        .unstack(unstack_variables)
     )
-    students.columns = ['{}_{}'.format(x[0], x[1].lower()) for x in students.columns]
+    # students = (
+    #     test_events
+    #     .reset_index()
+    #     .pivot(
+    #         index=['school_year', 'test', 'subtest', 'fast_id'],
+    #         columns = 'term',
+    #         values=['test_date', 'risk_level', 'percentile']
+    #     )
+    # )
+    students.columns = ['_'.join([inflection.underscore(variable_name) for variable_name in x]) for x in students.columns]
+    underlying_data_columns = list(students.columns)
+    # students.columns = ['{}_{}'.format(x[0], x[1].lower()) for x in students.columns]
     goals = (
         test_events
         .dropna(subset=['risk_level'])
-        .reorder_levels(['school_year', 'test', 'subtest', 'fast_id', 'term'])
-        .sort_index()
-        .groupby(['school_year', 'test', 'subtest', 'fast_id'])
+        .sort_values('test_date')
+        .groupby(new_index_variables)
         .agg(
+            risk_level_starting_date=('test_date', lambda x: x.dropna().iloc[0]),
+            risk_level_ending_date=('test_date', lambda x: x.dropna().iloc[-1]),
             starting_risk_level=('risk_level', lambda x: x.dropna().iloc[0]),
             ending_risk_level=('risk_level', lambda x: x.dropna().iloc[-1]),
         )
@@ -409,18 +430,17 @@ def summarize_by_student(
     percentiles = (
         test_events
         .dropna(subset=['percentile'])
-        .reorder_levels(['school_year', 'test', 'subtest', 'fast_id', 'term'])
-        .sort_index()
-        .groupby(['school_year', 'test', 'subtest', 'fast_id'])
+        .sort_values('test_date')
+        .groupby(new_index_variables)
         .agg(
-            starting_date=('test_date', lambda x: x.dropna().iloc[0]),
-            ending_date=('test_date', lambda x: x.dropna().iloc[-1]),
+            percentile_starting_date=('test_date', lambda x: x.dropna().iloc[0]),
+            percentile_ending_date=('test_date', lambda x: x.dropna().iloc[-1]),
             starting_percentile=('percentile', lambda x: x.dropna().iloc[0]),
             ending_percentile=('percentile', lambda x: x.dropna().iloc[-1]),
         )
     )
     students = (
-    students
+        students
         .join(
             goals,
             how='left'
@@ -433,10 +453,10 @@ def summarize_by_student(
     students['met_attainment_goal'] = (students['ending_risk_level'] == 'lowRisk')
     students['met_growth_goal'] = (students['starting_risk_level'] == 'highRisk') & (students['ending_risk_level'] != 'highRisk')
     students['met_goal'] = students['met_attainment_goal'] | students['met_growth_goal']
-    students['num_days'] = (
+    students['percentile_num_days'] = (
         np.subtract(
-            students['ending_date'],
-            students['starting_date']
+            students['percentile_ending_date'],
+            students['percentile_starting_date']
         )
         .apply(lambda x: x.days)
     )
@@ -444,44 +464,67 @@ def summarize_by_student(
         students['ending_percentile'],
         students['starting_percentile']
     )
-    students.loc[students['num_days'] < min_growth_days, 'percentile_growth'] = np.nan
-    students['percentile_growth_per_year'] = (
-        students
-        .apply(
-            lambda row: row['percentile_growth']/(row['num_days']/365.25) if not pd.isna(row['percentile_growth']) and row['num_days'] > 0 else np.nan,
-            axis=1
-        )
-    )
+    students.loc[students['percentile_num_days'] < min_growth_days, 'percentile_growth'] = np.nan
+    students['percentile_growth_per_school_year'] = 365.25*(school_year_duration_months/12)*students['percentile_growth']/students['percentile_num_days']
+    # students['percentile_growth_per_year'] = (
+    #     students
+    #     .apply(
+    #         lambda row: row['percentile_growth']/(row['num_days']/365.25) if not pd.isna(row['percentile_growth']) and row['num_days'] > 0 else np.nan,
+    #         axis=1
+    #     )
+    # )
     students = students.join(
         student_info,
         how='left',
         on=['fast_id', 'school_year']
     )
-    students = students.reindex(columns=[
-        'local_id',
-        'state_id',
-        'first_name',
-        'last_name',
-        'gender',
-        'birth_date',
-        'race',
-        'school',
-        'grade',
-        'test_date_fall',
-        'test_date_winter',
-        'test_date_spring',
-        'risk_level_fall',
-        'risk_level_winter',
-        'risk_level_spring',
-        'met_growth_goal',
-        'met_attainment_goal',
-        'met_goal',
-        'percentile_fall',
-        'percentile_winter',
-        'percentile_spring',
-        'percentile_growth',
-        'percentile_growth_per_year'
-    ])
+    students = students.reindex(columns=list(itertools.chain(
+        STUDENT_INFO_VARIABLES,
+        STUDENT_ASSIGNMENT_VARIABLES,
+        underlying_data_columns,
+        [
+            'risk_level_starting_date',
+            'risk_level_ending_date',
+            'risk_level_num_days',
+            'starting_risk_level',
+            'ending_risk_level',
+            'met_growth_goal',
+            'met_attainment_goal',
+            'met_goal',
+            'percentile_starting_date',
+            'percentile_ending_date',
+            'percentile_num_days',
+            'starting_percentile',
+            'ending_percentile',
+            'percentile_growth',
+            'percentile_growth_per_school_year',
+        ]
+    )))
+    # students = students.reindex(columns=[
+    #     'local_id',
+    #     'state_id',
+    #     'first_name',
+    #     'last_name',
+    #     'gender',
+    #     'birth_date',
+    #     'race',
+    #     'school',
+    #     'grade',
+    #     'test_date_fall',
+    #     'test_date_winter',
+    #     'test_date_spring',
+    #     'risk_level_fall',
+    #     'risk_level_winter',
+    #     'risk_level_spring',
+    #     'met_growth_goal',
+    #     'met_attainment_goal',
+    #     'met_goal',
+    #     'percentile_fall',
+    #     'percentile_winter',
+    #     'percentile_spring',
+    #     'percentile_growth',
+    #     'percentile_growth_per_year'
+    # ])
     if filter_dict is not None:
         students = wf_core_data.utils.filter_dataframe(
             dataframe=students,
@@ -517,8 +560,8 @@ def summarize_by_group(
             num_met_goal=('met_goal', 'sum'),
             num_valid_percentile_growth=('percentile_growth', 'count'),
             mean_percentile_growth=('percentile_growth', 'mean'),
-            num_valid_percentile_growth_per_year=('percentile_growth_per_year', 'count'),
-            mean_percentile_growth_per_year=('percentile_growth_per_year', 'mean')
+            num_valid_percentile_growth_per_school_year=('percentile_growth_per_school_year', 'count'),
+            mean_percentile_growth_per_school_year=('percentile_growth_per_school_year', 'mean')
         )
         .dropna(how='all')
     )
@@ -534,8 +577,8 @@ def summarize_by_group(
         'frac_met_goal',
         'num_valid_percentile_growth',
         'mean_percentile_growth',
-        'num_valid_percentile_growth_per_year',
-        'mean_percentile_growth_per_year'
+        'num_valid_percentile_growth_per_school_year',
+        'mean_percentile_growth_per_school_year'
     ])
     if filter_dict is not None:
         groups = wf_core_data.utils.filter_dataframe(
