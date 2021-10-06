@@ -153,7 +153,7 @@ DEFAULT_SCHOOL_YEAR_DURATION_MONTHS = 9
 DEFAULT_ROLLOVER_MONTH = 7
 DEFAULT_ROLLOVER_DAY = 31
 
-def fetch_and_parse_fastbridge_results_local_directory(
+def fetch_fastbridge_results_local_directory(
     dir_path,
     rollover_month=DEFAULT_ROLLOVER_MONTH,
     rollover_day=DEFAULT_ROLLOVER_DAY
@@ -176,82 +176,32 @@ def fetch_and_parse_fastbridge_results_local_directory(
         paths.append(file_path)
     if len(paths) == 0:
         raise ValueError('No CSV files found in directory')
-    test_events, student_info = fetch_and_parse_fastbridge_results_local_files(
+    results = fetch_fastbridge_results_local_files(
         paths=paths,
         rollover_month=rollover_month,
         rollover_day=rollover_day
     )
-    return test_events, student_info
+    return results
 
-def fetch_and_parse_fastbridge_results_local_files(
+def fetch_fastbridge_results_local_files(
     paths,
     rollover_month=DEFAULT_ROLLOVER_MONTH,
     rollover_day=DEFAULT_ROLLOVER_DAY
 ):
-    test_events_list=list()
-    student_info_list=list()
+    results_list=list()
     for path in paths:
-        results = fetch_fastbridge_results_local_file(
+        results_file = fetch_fastbridge_results_local_file(
             path=path,
             school_year=None,
             rollover_month=rollover_month,
             rollover_day=rollover_day
         )
-        test_events_file = extract_test_events(
-            results=results
-        )
-        student_info_file=extract_student_info(
-            results=results
-        )
-        test_events_list.append(test_events_file)
-        student_info_list.append(student_info_file)
-    test_events = pd.concat(
-        test_events_list
+        results_list.append(results_file)
+    results = pd.concat(
+        results_list,
+        ignore_index=True
     )
-    student_info = pd.concat(
-        student_info_list
-    )
-    test_events.sort_index(inplace=True)
-    student_info = (
-        student_info
-        .reset_index()
-        .drop_duplicates()
-        .set_index(['fast_id', 'school_year'])
-        .sort_index()
-    )
-    if student_info.index.duplicated().any():
-        raise ValueError('Files contain conflicting info for the same school year and FAST ID')
-    return test_events, student_info
-
-def fetch_fastbridge_results_local_file_and_extract_test_events(
-    path,
-    school_year=None,
-    rollover_month=DEFAULT_ROLLOVER_MONTH,
-    rollover_day=DEFAULT_ROLLOVER_DAY
-):
-    results = fetch_fastbridge_results_local_file(
-        path=path,
-        school_year=school_year,
-        rollover_month=rollover_month,
-        rollover_day=rollover_day
-    )
-    test_events = extract_test_events(
-        results=results
-    )
-    student_info = extract_student_info(
-        results=results
-    )
-    test_events.sort_index(inplace=True)
-    student_info = (
-        student_info
-        .reset_index()
-        .drop_duplicates()
-        .set_index('fast_id', 'school_year')
-        .sort_index()
-    )
-    if student_info.index.duplicated().any():
-        raise ValueError('Files contain conflicting info for the same school year and FAST ID')
-    return test_events, student_info
+    return results
 
 def fetch_fastbridge_results_local_file(
     path,
@@ -275,6 +225,13 @@ def fetch_fastbridge_results_local_file(
         )
     results.insert(0, 'school_year', school_year)
     return results
+
+def parse_fastbridge_results(
+    results
+):
+    test_events = extract_test_events(results)
+    student_info = extract_student_info(results)
+    return test_events, student_info
 
 def extract_test_events(
     results
