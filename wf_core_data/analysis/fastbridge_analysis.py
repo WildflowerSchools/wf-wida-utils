@@ -8,6 +8,41 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+TIME_FRAME_ID_VARIABLES = [
+    'school_year',
+    'term'
+]
+
+STUDENT_ID_VARIABLES_NWEA = [
+    'fast_id'
+]
+
+STUDENT_INFO_VARIABLES_NWEA = [
+    'local_id',
+    'state_id',
+    'first_name',
+    'last_name',
+    'gender',
+    'birth_date',
+    'race'
+]
+
+STUDENT_ASSIGNMENT_VARIABLES_NWEA = [
+    'school',
+    'grade'
+]
+
+ASSESSMENT_ID_VARIABLES_NWEA = [
+    'test',
+    'subtest'
+]
+
+RESULTS_VARIABLES_NWEA = [
+    'test_date',
+    'percentile',
+    'risk_level'
+]
+
 TERMS = (
     'Fall',
     'Winter',
@@ -106,6 +141,14 @@ TEST_DATE_FIELD_NAMES = (
     .loc[TEMP['metric'] == 'Final Date', 'field_name']
     .tolist()
 )
+
+TESTS = list(ASSESSMENTS.keys())
+
+SUBTESTS = list(itertools.chain(*ASSESSMENTS.values()))
+
+DEFAULT_MIN_GROWTH_DAYS = 60
+
+DEFAULT_SCHOOL_YEAR_DURATION_MONTHS = 9
 
 DEFAULT_ROLLOVER_MONTH = 7
 DEFAULT_ROLLOVER_DAY = 31
