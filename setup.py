@@ -6,7 +6,7 @@ VERSION = open(os.path.join(BASEDIR, 'VERSION')).read().strip()
 
 # Dependencies (format is 'PYPI_PACKAGE_NAME[>]=VERSION_NUMBER')
 BASE_DEPENDENCIES = [
-    'pandas>=1.1',
+    'pandas>=1.3',
     'numpy>=1.19',
     'requests>=2.25',
     'gspread-pandas>=2.2'
