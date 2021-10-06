@@ -166,18 +166,18 @@ def extract_test_events_nwea(
     test_events['rit_score_sem'] = pd.to_numeric(test_events['rit_score_sem']).astype('float')
     test_events['percentile'] = pd.to_numeric(test_events['percentile']).astype('float')
     test_events['percentile_se'] = pd.to_numeric(test_events['percentile_se'].replace('<1', 0.5)).astype('float')
-    test_events = test_events.reindex(columns=
-        TIME_FRAME_ID_VARIABLES_NWEA +
-        ASSESSMENT_ID_VARIABLES_NWEA +
-        STUDENT_ID_VARIABLES_NWEA +
+    test_events = test_events.reindex(columns=list(itertools.chain(
+        TIME_FRAME_ID_VARIABLES_NWEA,
+        ASSESSMENT_ID_VARIABLES_NWEA,
+        STUDENT_ID_VARIABLES_NWEA,
         RESULTS_VARIABLES_NWEA
-    )
+    )))
     test_events.set_index(
-        (
-            TIME_FRAME_ID_VARIABLES_NWEA +
-            ASSESSMENT_ID_VARIABLES_NWEA +
+        list(itertools.chain(
+            TIME_FRAME_ID_VARIABLES_NWEA,
+            ASSESSMENT_ID_VARIABLES_NWEA,
             STUDENT_ID_VARIABLES_NWEA
-        ),
+        )),
         inplace=True
     )
     test_events.sort_index(inplace=True)
@@ -200,11 +200,11 @@ def extract_student_info_nwea(
     student_info['school_year'] = student_info['term_school_year'].apply(lambda x: x.split(' ')[1])
     student_info = (
         student_info
-        .reindex(columns=
-            STUDENT_ID_VARIABLES_NWEA +
-            TIME_FRAME_ID_VARIABLES_NWEA +
+        .reindex(columns=list(itertools.chain(
+            STUDENT_ID_VARIABLES_NWEA,
+            TIME_FRAME_ID_VARIABLES_NWEA,
             STUDENT_INFO_VARIABLES_NWEA
-        )
+        )))
         .drop_duplicates()
     )
     student_info_changes = (
@@ -242,16 +242,16 @@ def extract_student_assignments_nwea(
     student_assignments['school_year'] = student_assignments['term_school_year'].apply(lambda x: x.split(' ')[1])
     student_assignments = (
         student_assignments
-        .reindex(columns=
-            STUDENT_ID_VARIABLES_NWEA +
-            TIME_FRAME_ID_VARIABLES_NWEA +
+        .reindex(columns=list(itertools.chain(
+            STUDENT_ID_VARIABLES_NWEA,
+            TIME_FRAME_ID_VARIABLES_NWEA,
             STUDENT_ASSIGNMENT_VARIABLES_NWEA
-        )
+        )))
         .drop_duplicates()
-        .set_index(
-            STUDENT_ID_VARIABLES_NWEA +
+        .set_index(list(itertools.chain(
+            STUDENT_ID_VARIABLES_NWEA,
             TIME_FRAME_ID_VARIABLES_NWEA
-        )
+        )))
         .sort_index()
     )
     return student_assignments
@@ -399,28 +399,34 @@ def summarize_by_student_nwea(
         student_assignments
         .reset_index()
         .sort_values(['school_year', 'term'])
-        .groupby(STUDENT_ID_VARIABLES_NWEA + new_time_index)
+        .groupby(list(itertools.chain(
+            STUDENT_ID_VARIABLES_NWEA,
+            new_time_index
+        )))
         .tail(1)
-        .set_index(STUDENT_ID_VARIABLES_NWEA + new_time_index)
+        .set_index(list(itertools.chain(
+            STUDENT_ID_VARIABLES_NWEA,
+            new_time_index
+        )))
     )
     students = students.join(
         latest_student_assignments,
         how='left',
         on=latest_student_assignments.index.names
     )
-    students = students.reindex(columns=
+    students = students.reindex(columns=list(itertools.chain(
         [
             'first_name',
             'last_name'
-        ] +
+        ],
         [
             'school',
             'teacher_last_first',
             'classroom',
             'grade'
 
-        ] +
-        underlying_data_columns +
+        ],
+        underlying_data_columns,
         [
             'rit_score_starting_date',
             'rit_score_ending_date',
@@ -437,7 +443,7 @@ def summarize_by_student_nwea(
             'percentile_growth',
             'percentile_growth_per_school_year',
         ]
-    )
+    )))
     if filter_dict is not None:
         students = wf_core_data.utils.filter_dataframe(
             dataframe=students,
