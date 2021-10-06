@@ -66,6 +66,10 @@ SUBJECTS_NWEA = list(ASSESSMENTS_NWEA.keys())
 
 COURSES_NWEA=list(itertools.chain(*ASSESSMENTS_NWEA.values()))
 
+DEFAULT_MIN_GROWTH_DAYS = 60
+
+DEFAULT_SCHOOL_YEAR_DURATION_MONTHS = 9
+
 def fetch_results_local_directory_nwea(
     path,
     file_extensions=['.csv', '.CSV']
@@ -256,9 +260,9 @@ def summarize_by_student_nwea(
     test_events,
     student_info,
     student_assignments,
-    min_growth_days=60,
     new_time_index=['school_year'],
-    # unstack_variables=['term'],
+    min_growth_days=DEFAULT_MIN_GROWTH_DAYS,
+    school_year_duration_months=DEFAULT_SCHOOL_YEAR_DURATION_MONTHS,
     filter_dict=None,
     select_dict=None
 ):
@@ -325,6 +329,7 @@ def summarize_by_student_nwea(
         students['starting_rit_score']
     )
     students.loc[students['rit_score_num_days'] < min_growth_days, 'rit_score_growth'] = np.nan
+    students['rit_score_growth_per_school_year'] = 365.25*(school_year_duration_months/12)*students['rit_score_growth']/students['rit_score_num_days']
     students['percentile_num_days'] = (
         np.subtract(
             students['percentile_ending_date'],
@@ -337,6 +342,7 @@ def summarize_by_student_nwea(
         students['starting_percentile']
     )
     students.loc[students['percentile_num_days'] < min_growth_days, 'percentile_growth'] = np.nan
+    students['percentile_growth_per_school_year'] = 365.25*(school_year_duration_months/12)*students['percentile_growth']/students['percentile_num_days']
     students = students.join(
         student_info,
         how='left',
@@ -375,12 +381,14 @@ def summarize_by_student_nwea(
             'starting_rit_score',
             'ending_rit_score',
             'rit_score_growth',
+            'rit_score_growth_per_school_year',
             'percentile_starting_date',
             'percentile_ending_date',
             'percentile_num_days',
             'starting_percentile',
             'ending_percentile',
-            'percentile_growth'
+            'percentile_growth',
+            'percentile_growth_per_school_year',
         ]
     )
     if filter_dict is not None:
@@ -414,12 +422,14 @@ def summarize_by_group_nwea(
             num_test_results=('student_id_nwea', 'count'),
             num_valid_rit_score_growth=('rit_score_growth', 'count'),
             mean_rit_score_growth=('rit_score_growth', 'mean'),
+            mean_rit_score_growth_per_school_year=('rit_score_growth_per_school_year', 'mean'),
             num_valid_starting_percentile=('starting_percentile', 'count'),
             mean_starting_percentile=('starting_percentile', 'mean'),
             num_valid_ending_percentile=('ending_percentile', 'count'),
             mean_ending_percentile=('ending_percentile', 'mean'),
             num_valid_percentile_growth=('percentile_growth', 'count'),
-            mean_percentile_growth=('percentile_growth', 'mean')
+            mean_percentile_growth=('percentile_growth', 'mean'),
+            mean_percentile_growth_per_school_year=('percentile_growth_per_school_year', 'mean')
         )
         .dropna(how='all')
     )
@@ -428,12 +438,14 @@ def summarize_by_group_nwea(
         'num_test_results',
         'num_valid_rit_score_growth',
         'mean_rit_score_growth',
+        'mean_rit_score_growth_per_school_year',
         'num_valid_starting_percentile',
         'mean_starting_percentile',
         'num_valid_ending_percentile',
         'mean_ending_percentile',
         'num_valid_percentile_growth',
-        'mean_percentile_growth'
+        'mean_percentile_growth',
+        'mean_percentile_growth_per_school_year'
     ])
     if filter_dict is not None:
         groups = wf_core_data.utils.filter_dataframe(
