@@ -232,8 +232,9 @@ def parse_fastbridge_results(
     results
 ):
     test_events = extract_test_events(results)
-    student_info = extract_student_info(results)
-    return test_events, student_info
+    student_info, student_info_changes = extract_student_info(results)
+    student_assignments = extract_student_assignments(results)
+    return test_events, student_info, student_info_changes, student_assignments
 
 def extract_test_events(
     results
@@ -357,32 +358,66 @@ def extract_student_info(
             'Last Name': 'last_name',
             'Gender': 'gender',
             'DOB': 'birth_date',
-            'Race': 'race',
+            'Race': 'race'
+        })
+    )
+    student_info['birth_date'] = student_info['birth_date'].apply(wf_core_data.utils.to_date)
+    student_info = (
+        student_info
+        .reindex(columns=list(itertools.chain(
+            STUDENT_ID_VARIABLES,
+            ['school_year'],
+            STUDENT_INFO_VARIABLES
+        )))
+        .drop_duplicates()
+    )
+    student_info_changes = (
+        student_info
+        .groupby(STUDENT_ID_VARIABLES)
+        .filter(lambda group: len(group.drop_duplicates(subset=STUDENT_INFO_VARIABLES)) > 1)
+    )
+    student_info = (
+        student_info
+        .sort_values('school_year')
+        .drop(columns='school_year')
+        .groupby(STUDENT_ID_VARIABLES)
+        .tail(1)
+        .set_index(STUDENT_ID_VARIABLES)
+        .sort_index()
+    )
+    return student_info, student_info_changes
+
+def extract_student_assignments(
+    results
+):
+    student_assignments = (
+        results
+        .rename(columns= {
+            'FAST ID': 'fast_id',
             'School': 'school',
             'Grade': 'grade'
         })
     )
-    student_info['birth_date'] = student_info['birth_date'].apply(wf_core_data.utils.to_date)
-    student_info.set_index(
-        ['fast_id', 'school_year'],
-        inplace=True
+    student_assignments = (
+        student_assignments
+        .reindex(columns=list(itertools.chain(
+            STUDENT_ID_VARIABLES,
+            ['school_year'],
+            STUDENT_ASSIGNMENT_VARIABLES
+        )))
+        .drop_duplicates()
+        .set_index(list(itertools.chain(
+            STUDENT_ID_VARIABLES,
+            ['school_year']
+        )))
+        .sort_index()
     )
-    student_info = student_info.reindex(columns=[
-        'local_id',
-        'state_id',
-        'first_name',
-        'last_name',
-        'gender',
-        'birth_date',
-        'race',
-        'school',
-        'grade'
-    ])
-    return student_info
+    return student_assignments
 
 def summarize_by_student(
     test_events,
     student_info,
+    student_assignments,
     new_time_index=['school_year'],
     min_growth_days=DEFAULT_MIN_GROWTH_DAYS,
     school_year_duration_months=DEFAULT_SCHOOL_YEAR_DURATION_MONTHS,
@@ -457,7 +492,30 @@ def summarize_by_student(
     students = students.join(
         student_info,
         how='left',
-        on=['fast_id', 'school_year']
+        on=STUDENT_ID_VARIABLES
+    )
+    if 'school_year' in new_time_index:
+        student_assignment_time_index = ['school_year']
+    else:
+        student_assignment_time_index = []
+    latest_student_assignments = (
+        student_assignments
+        .reset_index()
+        .sort_values(['school_year'])
+        .groupby(list(itertools.chain(
+            STUDENT_ID_VARIABLES,
+            student_assignment_time_index
+        )))
+        .tail(1)
+        .set_index(list(itertools.chain(
+            STUDENT_ID_VARIABLES,
+            student_assignment_time_index
+        )))
+    )
+    students = students.join(
+        latest_student_assignments,
+        how='left',
+        on=list(latest_student_assignments.index.names)
     )
     students = students.reindex(columns=list(itertools.chain(
         STUDENT_INFO_VARIABLES,
