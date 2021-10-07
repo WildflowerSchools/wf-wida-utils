@@ -256,7 +256,7 @@ def extract_student_assignments_nwea(
     )
     return student_assignments
 
-def summarize_by_test(
+def summarize_by_test_nwea(
     test_events,
     student_assignments,
     grouping_variables = [

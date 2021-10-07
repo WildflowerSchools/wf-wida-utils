@@ -1,12 +1,49 @@
 import wf_core_data.utils
 import pandas as pd
 import numpy as np
+import inflection
 import collections
 import itertools
+import copy
 import os
 import logging
 
 logger = logging.getLogger(__name__)
+
+TIME_FRAME_ID_VARIABLES = [
+    'school_year',
+    'term'
+]
+
+STUDENT_ID_VARIABLES = [
+    'fast_id'
+]
+
+STUDENT_INFO_VARIABLES = [
+    'local_id',
+    'state_id',
+    'first_name',
+    'last_name',
+    'gender',
+    'birth_date',
+    'race'
+]
+
+STUDENT_ASSIGNMENT_VARIABLES = [
+    'school',
+    'grade'
+]
+
+ASSESSMENT_ID_VARIABLES = [
+    'test',
+    'subtest'
+]
+
+RESULTS_VARIABLES = [
+    'test_date',
+    'percentile',
+    'risk_level'
+]
 
 TERMS = (
     'Fall',
@@ -107,10 +144,18 @@ TEST_DATE_FIELD_NAMES = (
     .tolist()
 )
 
+TESTS = list(ASSESSMENTS.keys())
+
+SUBTESTS = list(itertools.chain(*ASSESSMENTS.values()))
+
+DEFAULT_MIN_GROWTH_DAYS = 60
+
+DEFAULT_SCHOOL_YEAR_DURATION_MONTHS = 9
+
 DEFAULT_ROLLOVER_MONTH = 7
 DEFAULT_ROLLOVER_DAY = 31
 
-def fetch_and_parse_fastbridge_results_local_directory(
+def fetch_fastbridge_results_local_directory(
     dir_path,
     rollover_month=DEFAULT_ROLLOVER_MONTH,
     rollover_day=DEFAULT_ROLLOVER_DAY
@@ -133,82 +178,32 @@ def fetch_and_parse_fastbridge_results_local_directory(
         paths.append(file_path)
     if len(paths) == 0:
         raise ValueError('No CSV files found in directory')
-    test_events, student_info = fetch_and_parse_fastbridge_results_local_files(
+    results = fetch_fastbridge_results_local_files(
         paths=paths,
         rollover_month=rollover_month,
         rollover_day=rollover_day
     )
-    return test_events, student_info
+    return results
 
-def fetch_and_parse_fastbridge_results_local_files(
+def fetch_fastbridge_results_local_files(
     paths,
     rollover_month=DEFAULT_ROLLOVER_MONTH,
     rollover_day=DEFAULT_ROLLOVER_DAY
 ):
-    test_events_list=list()
-    student_info_list=list()
+    results_list=list()
     for path in paths:
-        results = fetch_fastbridge_results_local_file(
+        results_file = fetch_fastbridge_results_local_file(
             path=path,
             school_year=None,
             rollover_month=rollover_month,
             rollover_day=rollover_day
         )
-        test_events_file = extract_test_events(
-            results=results
-        )
-        student_info_file=extract_student_info(
-            results=results
-        )
-        test_events_list.append(test_events_file)
-        student_info_list.append(student_info_file)
-    test_events = pd.concat(
-        test_events_list
+        results_list.append(results_file)
+    results = pd.concat(
+        results_list,
+        ignore_index=True
     )
-    student_info = pd.concat(
-        student_info_list
-    )
-    test_events.sort_index(inplace=True)
-    student_info = (
-        student_info
-        .reset_index()
-        .drop_duplicates()
-        .set_index(['fast_id', 'school_year'])
-        .sort_index()
-    )
-    if student_info.index.duplicated().any():
-        raise ValueError('Files contain conflicting info for the same school year and FAST ID')
-    return test_events, student_info
-
-def fetch_fastbridge_results_local_file_and_extract_test_events(
-    path,
-    school_year=None,
-    rollover_month=DEFAULT_ROLLOVER_MONTH,
-    rollover_day=DEFAULT_ROLLOVER_DAY
-):
-    results = fetch_fastbridge_results_local_file(
-        path=path,
-        school_year=school_year,
-        rollover_month=rollover_month,
-        rollover_day=rollover_day
-    )
-    test_events = extract_test_events(
-        results=results
-    )
-    student_info = extract_student_info(
-        results=results
-    )
-    test_events.sort_index(inplace=True)
-    student_info = (
-        student_info
-        .reset_index()
-        .drop_duplicates()
-        .set_index('fast_id', 'school_year')
-        .sort_index()
-    )
-    if student_info.index.duplicated().any():
-        raise ValueError('Files contain conflicting info for the same school year and FAST ID')
-    return test_events, student_info
+    return results
 
 def fetch_fastbridge_results_local_file(
     path,
@@ -232,6 +227,14 @@ def fetch_fastbridge_results_local_file(
         )
     results.insert(0, 'school_year', school_year)
     return results
+
+def parse_fastbridge_results(
+    results
+):
+    test_events = extract_test_events(results)
+    student_info, student_info_changes = extract_student_info(results)
+    student_assignments = extract_student_assignments(results)
+    return test_events, student_info, student_info_changes, student_assignments
 
 def extract_test_events(
     results
@@ -355,53 +358,137 @@ def extract_student_info(
             'Last Name': 'last_name',
             'Gender': 'gender',
             'DOB': 'birth_date',
-            'Race': 'race',
+            'Race': 'race'
+        })
+    )
+    student_info['birth_date'] = student_info['birth_date'].apply(wf_core_data.utils.to_date)
+    student_info = (
+        student_info
+        .reindex(columns=list(itertools.chain(
+            STUDENT_ID_VARIABLES,
+            ['school_year'],
+            STUDENT_INFO_VARIABLES
+        )))
+        .drop_duplicates()
+    )
+    student_info_changes = (
+        student_info
+        .groupby(STUDENT_ID_VARIABLES)
+        .filter(lambda group: len(group.drop_duplicates(subset=STUDENT_INFO_VARIABLES)) > 1)
+    )
+    student_info = (
+        student_info
+        .sort_values('school_year')
+        .drop(columns='school_year')
+        .groupby(STUDENT_ID_VARIABLES)
+        .tail(1)
+        .set_index(STUDENT_ID_VARIABLES)
+        .sort_index()
+    )
+    return student_info, student_info_changes
+
+def extract_student_assignments(
+    results
+):
+    student_assignments = (
+        results
+        .rename(columns= {
+            'FAST ID': 'fast_id',
             'School': 'school',
             'Grade': 'grade'
         })
     )
-    student_info['birth_date'] = student_info['birth_date'].apply(wf_core_data.utils.to_date)
-    student_info.set_index(
-        ['fast_id', 'school_year'],
-        inplace=True
+    student_assignments = (
+        student_assignments
+        .reindex(columns=list(itertools.chain(
+            STUDENT_ID_VARIABLES,
+            ['school_year'],
+            STUDENT_ASSIGNMENT_VARIABLES
+        )))
+        .drop_duplicates()
+        .set_index(list(itertools.chain(
+            STUDENT_ID_VARIABLES,
+            ['school_year']
+        )))
+        .sort_index()
     )
-    student_info = student_info.reindex(columns=[
-        'local_id',
-        'state_id',
-        'first_name',
-        'last_name',
-        'gender',
-        'birth_date',
-        'race',
+    return student_assignments
+
+def summarize_by_test(
+    test_events,
+    student_assignments,
+    grouping_variables = [
+        'school_year',
         'school',
-        'grade'
-    ])
-    return student_info
+        'test',
+        'subtest',
+        'term'
+    ],
+    filter_dict=None,
+    select_dict=None
+):
+    tests = (
+        test_events
+        .join(
+            student_assignments,
+            how='left',
+            on=[
+                'fast_id',
+                'school_year'
+            ]
+        )
+        .groupby(grouping_variables)
+        .agg(
+            num_test_events=('test_date', 'count'),
+            num_valid_risk_level=('risk_level', 'count'),
+            num_valid_percentile=('percentile', 'count')
+        )
+    )
+    tests = tests.loc[tests['num_test_events'] > 0].copy()
+    if filter_dict is not None:
+        tests = wf_core_data.utils.filter_dataframe(
+            dataframe=tests,
+            filter_dict=filter_dict
+        )
+    if select_dict is not None:
+        tests = wf_core_data.utils.select_from_dataframe(
+            dataframe=tests,
+            select_dict=select_dict
+        )
+    return tests
 
 def summarize_by_student(
     test_events,
     student_info,
-    min_growth_days=60,
+    student_assignments,
+    new_time_index=['school_year'],
+    min_growth_days=DEFAULT_MIN_GROWTH_DAYS,
+    school_year_duration_months=DEFAULT_SCHOOL_YEAR_DURATION_MONTHS,
     filter_dict=None,
     select_dict=None
 ):
+    new_index_variables = list(itertools.chain(
+        new_time_index,
+        ASSESSMENT_ID_VARIABLES,
+        STUDENT_ID_VARIABLES
+    ))
+    unstack_variables = copy.deepcopy(TIME_FRAME_ID_VARIABLES)
+    for new_time_index_variable in new_time_index:
+        unstack_variables.remove(new_time_index_variable)
     students = (
         test_events
-        .reset_index()
-        .pivot(
-            index=['school_year', 'test', 'subtest', 'fast_id'],
-            columns = 'term',
-            values=['test_date', 'risk_level', 'percentile']
-        )
+        .unstack(unstack_variables)
     )
-    students.columns = ['{}_{}'.format(x[0], x[1].lower()) for x in students.columns]
+    students.columns = ['_'.join([inflection.underscore(variable_name) for variable_name in x]) for x in students.columns]
+    underlying_data_columns = list(students.columns)
     goals = (
         test_events
         .dropna(subset=['risk_level'])
-        .reorder_levels(['school_year', 'test', 'subtest', 'fast_id', 'term'])
-        .sort_index()
-        .groupby(['school_year', 'test', 'subtest', 'fast_id'])
+        .sort_values('test_date')
+        .groupby(new_index_variables)
         .agg(
+            risk_level_starting_date=('test_date', lambda x: x.dropna().iloc[0]),
+            risk_level_ending_date=('test_date', lambda x: x.dropna().iloc[-1]),
             starting_risk_level=('risk_level', lambda x: x.dropna().iloc[0]),
             ending_risk_level=('risk_level', lambda x: x.dropna().iloc[-1]),
         )
@@ -409,18 +496,17 @@ def summarize_by_student(
     percentiles = (
         test_events
         .dropna(subset=['percentile'])
-        .reorder_levels(['school_year', 'test', 'subtest', 'fast_id', 'term'])
-        .sort_index()
-        .groupby(['school_year', 'test', 'subtest', 'fast_id'])
+        .sort_values('test_date')
+        .groupby(new_index_variables)
         .agg(
-            starting_date=('test_date', lambda x: x.dropna().iloc[0]),
-            ending_date=('test_date', lambda x: x.dropna().iloc[-1]),
+            percentile_starting_date=('test_date', lambda x: x.dropna().iloc[0]),
+            percentile_ending_date=('test_date', lambda x: x.dropna().iloc[-1]),
             starting_percentile=('percentile', lambda x: x.dropna().iloc[0]),
             ending_percentile=('percentile', lambda x: x.dropna().iloc[-1]),
         )
     )
     students = (
-    students
+        students
         .join(
             goals,
             how='left'
@@ -433,10 +519,10 @@ def summarize_by_student(
     students['met_attainment_goal'] = (students['ending_risk_level'] == 'lowRisk')
     students['met_growth_goal'] = (students['starting_risk_level'] == 'highRisk') & (students['ending_risk_level'] != 'highRisk')
     students['met_goal'] = students['met_attainment_goal'] | students['met_growth_goal']
-    students['num_days'] = (
+    students['percentile_num_days'] = (
         np.subtract(
-            students['ending_date'],
-            students['starting_date']
+            students['percentile_ending_date'],
+            students['percentile_starting_date']
         )
         .apply(lambda x: x.days)
     )
@@ -444,44 +530,58 @@ def summarize_by_student(
         students['ending_percentile'],
         students['starting_percentile']
     )
-    students.loc[students['num_days'] < min_growth_days, 'percentile_growth'] = np.nan
-    students['percentile_growth_per_year'] = (
-        students
-        .apply(
-            lambda row: row['percentile_growth']/(row['num_days']/365.25) if not pd.isna(row['percentile_growth']) and row['num_days'] > 0 else np.nan,
-            axis=1
-        )
-    )
+    students.loc[students['percentile_num_days'] < min_growth_days, 'percentile_growth'] = np.nan
+    students['percentile_growth_per_school_year'] = 365.25*(school_year_duration_months/12)*students['percentile_growth']/students['percentile_num_days']
     students = students.join(
         student_info,
         how='left',
-        on=['fast_id', 'school_year']
+        on=STUDENT_ID_VARIABLES
     )
-    students = students.reindex(columns=[
-        'local_id',
-        'state_id',
-        'first_name',
-        'last_name',
-        'gender',
-        'birth_date',
-        'race',
-        'school',
-        'grade',
-        'test_date_fall',
-        'test_date_winter',
-        'test_date_spring',
-        'risk_level_fall',
-        'risk_level_winter',
-        'risk_level_spring',
-        'met_growth_goal',
-        'met_attainment_goal',
-        'met_goal',
-        'percentile_fall',
-        'percentile_winter',
-        'percentile_spring',
-        'percentile_growth',
-        'percentile_growth_per_year'
-    ])
+    if 'school_year' in new_time_index:
+        student_assignment_time_index = ['school_year']
+    else:
+        student_assignment_time_index = []
+    latest_student_assignments = (
+        student_assignments
+        .reset_index()
+        .sort_values(['school_year'])
+        .groupby(list(itertools.chain(
+            STUDENT_ID_VARIABLES,
+            student_assignment_time_index
+        )))
+        .tail(1)
+        .set_index(list(itertools.chain(
+            STUDENT_ID_VARIABLES,
+            student_assignment_time_index
+        )))
+    )
+    students = students.join(
+        latest_student_assignments,
+        how='left',
+        on=list(latest_student_assignments.index.names)
+    )
+    students = students.reindex(columns=list(itertools.chain(
+        STUDENT_INFO_VARIABLES,
+        STUDENT_ASSIGNMENT_VARIABLES,
+        underlying_data_columns,
+        [
+            'risk_level_starting_date',
+            'risk_level_ending_date',
+            'risk_level_num_days',
+            'starting_risk_level',
+            'ending_risk_level',
+            'met_growth_goal',
+            'met_attainment_goal',
+            'met_goal',
+            'percentile_starting_date',
+            'percentile_ending_date',
+            'percentile_num_days',
+            'starting_percentile',
+            'ending_percentile',
+            'percentile_growth',
+            'percentile_growth_per_school_year',
+        ]
+    )))
     if filter_dict is not None:
         students = wf_core_data.utils.filter_dataframe(
             dataframe=students,
@@ -517,8 +617,7 @@ def summarize_by_group(
             num_met_goal=('met_goal', 'sum'),
             num_valid_percentile_growth=('percentile_growth', 'count'),
             mean_percentile_growth=('percentile_growth', 'mean'),
-            num_valid_percentile_growth_per_year=('percentile_growth_per_year', 'count'),
-            mean_percentile_growth_per_year=('percentile_growth_per_year', 'mean')
+            mean_percentile_growth_per_school_year=('percentile_growth_per_school_year', 'mean')
         )
         .dropna(how='all')
     )
@@ -534,8 +633,7 @@ def summarize_by_group(
         'frac_met_goal',
         'num_valid_percentile_growth',
         'mean_percentile_growth',
-        'num_valid_percentile_growth_per_year',
-        'mean_percentile_growth_per_year'
+        'mean_percentile_growth_per_school_year'
     ])
     if filter_dict is not None:
         groups = wf_core_data.utils.filter_dataframe(
@@ -569,15 +667,11 @@ def infer_school_year_from_results(
             .unique()
             .tolist()
         )
-        # print(school_years_subtest)
         school_years.extend(school_years_subtest)
-    # print(school_years)
     school_years = np.unique(school_years).tolist()
-    # print(school_years)
     if len(school_years) == 0:
         raise ValueError('No parseable test dates found')
     if len(school_years) > 1:
         raise ValueError('Data contains multiple school years')
     school_year = school_years[0]
-    # print(school_year)
     return school_year
