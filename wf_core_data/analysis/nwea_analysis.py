@@ -321,8 +321,6 @@ def summarize_by_student_nwea(
     unstack_variables = copy.deepcopy(TIME_FRAME_ID_VARIABLES_NWEA)
     for new_time_index_variable in new_time_index:
         unstack_variables.remove(new_time_index_variable)
-    print(new_index_variables)
-    print(unstack_variables)
     students = (
         test_events
         .unstack(unstack_variables)
