@@ -414,6 +414,49 @@ def extract_student_assignments(
     )
     return student_assignments
 
+def summarize_by_test(
+    test_events,
+    student_assignments,
+    grouping_variables = [
+        'school_year',
+        'school',
+        'test',
+        'subtest',
+        'term'
+    ],
+    filter_dict=None,
+    select_dict=None
+):
+    tests = (
+        test_events
+        .join(
+            student_assignments,
+            how='left',
+            on=[
+                'fast_id',
+                'school_year'
+            ]
+        )
+        .groupby(grouping_variables)
+        .agg(
+            num_test_events=('test_date', 'count'),
+            num_valid_risk_level=('risk_level', 'count'),
+            num_valid_percentile=('percentile', 'count')
+        )
+    )
+    tests = tests.loc[tests['num_test_events'] > 0].copy()
+    if filter_dict is not None:
+        tests = wf_core_data.utils.filter_dataframe(
+            dataframe=tests,
+            filter_dict=filter_dict
+        )
+    if select_dict is not None:
+        tests = wf_core_data.utils.select_from_dataframe(
+            dataframe=tests,
+            select_dict=select_dict
+        )
+    return tests
+
 def summarize_by_student(
     test_events,
     student_info,
