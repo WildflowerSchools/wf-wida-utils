@@ -413,17 +413,8 @@ def summarize_by_student_nwea(
         on=latest_student_assignments.index.names
     )
     students = students.reindex(columns=list(itertools.chain(
-        [
-            'first_name',
-            'last_name'
-        ],
-        [
-            'school',
-            'teacher_last_first',
-            'classroom',
-            'grade'
-
-        ],
+        STUDENT_INFO_VARIABLES_NWEA,
+        STUDENT_ASSIGNMENT_VARIABLES_NWEA,
         underlying_data_columns,
         [
             'rit_score_starting_date',

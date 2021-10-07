@@ -3,7 +3,6 @@
 Python tools for working with Wildflower Schools core data
 
 ## Tasks
-* Finish replacing lists of columns with constants in NWEA code
 * Consider splitting library into atomic libraries for each assessment and data source
 * Update naming of submodules and functions to be more consistent across assessments
 * NWEA: Add ability to handle more detailed data download (separate test event and student files)
