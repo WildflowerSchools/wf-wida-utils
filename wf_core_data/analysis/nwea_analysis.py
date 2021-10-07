@@ -321,8 +321,6 @@ def summarize_by_student_nwea(
     unstack_variables = copy.deepcopy(TIME_FRAME_ID_VARIABLES_NWEA)
     for new_time_index_variable in new_time_index:
         unstack_variables.remove(new_time_index_variable)
-    print(new_index_variables)
-    print(unstack_variables)
     students = (
         test_events
         .unstack(unstack_variables)
@@ -415,17 +413,8 @@ def summarize_by_student_nwea(
         on=latest_student_assignments.index.names
     )
     students = students.reindex(columns=list(itertools.chain(
-        [
-            'first_name',
-            'last_name'
-        ],
-        [
-            'school',
-            'teacher_last_first',
-            'classroom',
-            'grade'
-
-        ],
+        STUDENT_INFO_VARIABLES_NWEA,
+        STUDENT_ASSIGNMENT_VARIABLES_NWEA,
         underlying_data_columns,
         [
             'rit_score_starting_date',
