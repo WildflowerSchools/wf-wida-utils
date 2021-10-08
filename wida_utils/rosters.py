@@ -1,5 +1,4 @@
-import wf_core_data.rosters.shared_constants
-import wf_core_data.rosters.shared_functions
+import wf_core_data
 import pandas as pd
 import os
 import logging
@@ -93,7 +92,7 @@ WIDA_TESTABLE_GRADES = [
     '00'
 ]
 
-def create_wida_roster_and_write_locally(
+def create_roster_and_write_locally(
     base_directory,
     filename_suffix,
     master_roster_subdirectory='master_rosters',
@@ -114,10 +113,10 @@ def create_wida_roster_and_write_locally(
         )
     )
     master_roster_data = pd.read_pickle(filename)
-    wida_roster_data = wf_core_data.create_wida_roster(
+    wida_roster_data = create_roster(
         master_roster_data=master_roster_data
     )
-    wf_core_data.write_wida_rosters_local(
+    write_rosters_local(
         wida_roster_data=wida_roster_data,
         base_directory=base_directory,
         subdirectory=wida_roster_subdirectory,
@@ -125,7 +124,7 @@ def create_wida_roster_and_write_locally(
         filename_suffix=filename_suffix
     )
 
-def create_wida_roster(
+def create_roster(
     master_roster_data
 ):
     ## Rename fields
@@ -218,7 +217,7 @@ def create_wida_roster(
     ))
     return wida_roster_data
 
-def write_wida_rosters_local(
+def write_rosters_local(
     wida_roster_data,
     base_directory,
     subdirectory='wida_rosters',
