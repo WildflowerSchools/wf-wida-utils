@@ -90,7 +90,10 @@ WIDA_GRADE_NAME_MAP = {
 }
 
 WIDA_TESTABLE_GRADES = [
-    '00'
+    '00',
+    '01',
+    '02',
+    '03'
 ]
 
 def create_roster_and_write_locally(
